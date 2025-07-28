@@ -4,22 +4,6 @@ from bpy.types import Operator
 from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty, PointerProperty, CollectionProperty
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 
-class TBSEKIT_UL_chestGear(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        pass
-
-class TBSEKIT_UL_legGear(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        pass
-
-class TBSEKIT_UL_handGear(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        pass
-
-class TBSEKIT_UL_feetGear(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        pass
-
 class TBSEKIT_OT_setToDefault(Operator):
     "Resets all shapekeys and toggles back to default."
     bl_idname = "object.set_to_default"

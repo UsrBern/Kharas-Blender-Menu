@@ -1,5 +1,5 @@
 
-"""TBSE Body Kit Blender Addon initialization."""
+# TBSE Body Kit Blender Addon initialization.
 
 import bpy
 from . import properties
