@@ -1,0 +1,78 @@
+{
+    "body_neck": {
+        "tbse_neck": "[1] TBSE Neck Part 0.1"
+    },
+    "body_hands": {
+        "tbse_hands": "[0] TBSE Hands Part 0.0"
+    },
+    "body_feet": {
+        "tbse_feet": "[0] TBSE Feet Part 0.0"
+    },
+    "body_chest": {
+        "tbse_torso": "[0] TBSE Torso Part 0.0",
+        "tbse_wrist": "[2] TBSE Wrist Part 0.2",
+        "tbse_elbow": "[3] TBSE Elbow Part 0.3"
+    },
+    "body_chest_w": {
+        "w_torso": "[0] W Torso Part 0.0",
+        "w_wrist": "[2] W Wrist Part 0.2",
+        "w_elbow": "[3] W Elbow Part 0.3"
+    },
+    "body_chest_chonk": {
+        "chonk_torso": "[0] CHONK Torso Part 0.0",
+        "chonk_neck": "[1] CHONK Neck Part 0.1",
+        "chonk_wrist": "[2] CHONK Wrist Part 0.2",
+        "chonk_elbow": "[3] CHONK Elbow Part 0.3"
+    },
+    "body_chest_chonk1": {
+        "chonk_torso": "[0] CHONK 1.0 Torso Part 0.0",
+        "chonk_wrist": "[2] CHONK 1.0 Wrist Part 0.2",
+        "chonk_elbow": "[3] CHONK 1.0 Elbow Part 0.3"
+    },
+    "body_legs": {
+        "legs_shin": "[1] TBSE Shin Part 0.1",
+        "legs_knee": "[2] TBSE Knee Part 0.2"
+    },
+    "body_legs_chonk": {
+        "chonk_butt": "[0] CHONK Butt Part 0.0",
+        "chonk_shin": "[1] CHONK Shin Part 0.1",
+        "chonk_knee": "[2] CHONK Knee Part 0.2",
+        "chonk_nsfw": "[3] CHONK NSFW Part 0.3"
+    },
+    "body_genitals": {
+        "genitals_amab": "[0] TBSE Butt Part 0.0",
+        "genitals_afab": "[0] FTM Butt Part 0.0"
+    },
+    "genitals_amab": {
+        "amab_a": "Flaccid A Part 0.3",
+        "amab_b": "Flaccid B Part 0.3",
+        "amab_c": "Flaccid C Part 0.3",
+        "amab_d": "Flaccid D Part 0.3",
+        "squish": "Squished Part 0.3"
+    },
+    "genitals_afab": {
+        "afab_bbwvr": "[3] FTM BBWVR Part 0.3",
+        "afab_bibo": "[3] FTM Bibo Part 0.3"
+    },
+    "genitals_bpf": {
+        "bpf_large": "[0] BPF FTM Large Part 1.0",
+        "bpf_small": "[1] BPF FTM Small Part 1.1"
+    },
+    "piercings_chest": {
+        "nipple_ring": "[0] Nipple - Ring Part 1.0",
+        "nipple_bar": "[1] Nipple - Bar Part 1.1",
+        "nipple_spike": "[2] Nipple - Spiked Part 1.2",
+        "navel_bar": "[3] Navel - Bar Part 1.3",
+        "navel_spike": "[4] Navel - Spiked Part 1.4",
+        "hip_bar": "[5] Hip - Bar Part 1.5",
+        "hip_spike": "[6] Hip - Spiked Part 1.6"
+    },
+    "piercings_amab": {
+        "jacob_piercing": "[0] Jacob Ladder Part 1.0",
+        "albert_piercing": "[1] Prince Albert Part 1.1"
+    },
+    "gear_chest": {},
+    "gear_legs": {},
+    "gear_hands": {},
+    "gear_feet": {}
+}
