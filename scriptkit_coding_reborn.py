@@ -1,0 +1,2204 @@
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTIBILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+from typing import Dict, List, Optional
+
+# Author Addendum: 
+#   You will not find this useful, it's trash code, im so sorry.
+
+"""
+TBSE Body Kit Blender Addon
+
+This addon provides a free and open-source toolkit for working with TBSE body models in Blender.
+Features include:
+- Toggling visibility of body parts and gear
+- Managing shape keys for multiple body types
+- Importing and exporting FBX files with optimal settings for modding
+- Bulk renaming and management of models
+- Advanced options for piercings, NSFW toggles, and bone groups
+
+Usage:
+- Install via Blender's Add-ons menu
+- Access via View3D > Sidebar > Body Kit
+
+Author: Crow (FOSS version)
+Maintainers: Community
+License: GPLv3
+
+For help and documentation, see the README.md or ask in the project repository.
+"""
+
+bl_info = {
+    "name": "TBSE Body Kit",
+    "author": "Crow",
+    "description": "Script to be used in conjunction with TBSE Upscale Kit. Includes multiple TBSE bodies.",
+    "blender": (2, 80, 0),
+    "version": (1, 0, 0),
+    "location": "View3D > Sidebar > Body Kit",
+}
+
+import bpy
+import os
+from bpy.props import (BoolProperty,
+                       EnumProperty,
+                       IntProperty,
+                       StringProperty,
+                       PointerProperty,
+                       CollectionProperty)
+from bpy.types import (PropertyGroup,
+                       Operator,
+                       Panel,
+                       UIList,
+                       Scene,
+                       Menu)
+
+from bpy_extras.io_utils import (ImportHelper,
+                                 ExportHelper)
+import json
+import pathlib
+
+# ==================== #
+#   FEATURES + PLANS   #
+# ==================== #
+
+# reset to default tbse [DONE]
+# hide body parts [DONE]
+# all shape keys [DONE]
+    # seperate ones for top + bottoms [DONE]
+# AMAB + AFAB options [DONE]
+    # BPF toggle [DONE]
+    # flaccid + erect versions?
+# hide piercings/piercing options [DONE]
+
+# importing and exporting: 
+    # import settings [DONE]
+        # fix bone rotation
+        # clearing parents
+        # fixing alpha
+        # fixing metallic
+    # importing automatically assigns the right armature [DONE]
+    # export settings [DONE]
+        # putting bone rotation back to usual xiv models
+    # batch export [TBD]
+        # exports all gear options and shapekeys 
+        # pick name + iteration
+
+# advanced : 
+    # change namings [DONE]
+    # adding shapekeys and drivers to new objects/gear [DONE]
+    # bone groups [DONE]
+
+# Other to-dos
+    # add tbse w models [DONE]
+    # add updated chonk models + shapes [DONE]
+    # ivcs but with modifiers >:3
+    # fucking fix my other modifiers too dumb ass corvid [DONE]
+    # add squished amab nsfw option [DONE]
+
+# ==================== #
+#   RESET TO DEFAULT   #
+# ==================== #
+
+# Resets the blender scene to:
+    # Chest, Legs, Hand, and Feet ENABLED
+    # NSFW DISABLED
+    # TBSE chest shape
+    # TBSE leg shape
+    # AMAB genital type - Gen A
+
+    # hide chest piercings
+    # hide amab piercings
+
+class TBSEKIT_OT_setToDefault(Operator):
+    "Resets all shapekeys and toggles back to default."
+    bl_idname = "object.set_to_default"
+    bl_label = "Set to Default"
+    bl_options = {"REGISTER","UNDO"}
+
+    @classmethod
+    def poll(cls,context):
+        return context.mode == "OBJECT"
+    
+    def execute(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+        chest_toggles = context.scene.tbse_chest_toggles
+        amab_toggles = context.scene.tbse_amab_toggles
+
+        # go through all properties within tbse_properties and set them back to default
+        for prop_name, prop in tbse_properties.bl_rna.properties.items():
+            if hasattr(prop, 'default'): setattr(tbse_properties, prop_name, prop.default)
+        # go through all properties within chest_toggles and set them back to default
+        for prop_name, prop in chest_toggles.bl_rna.properties.items():
+            if hasattr(prop, 'default'): setattr(chest_toggles, prop_name, prop.default)
+        # go through all properties within amab_toggles and set them back to default
+        for prop_name, prop in amab_toggles.bl_rna.properties.items():
+            if hasattr(prop, 'default'): setattr(amab_toggles, prop_name, prop.default)
+
+        return {'FINISHED'}
+
+
+# ================= #
+#   MODEL TOGGLES   #
+# ================= #
+
+# Toggle visibility of all chest-related models based on user settings.
+
+# - Hides all chest models by default.
+# - Shows specific chest models depending on the selected chest shape.
+# - Handles piercings if enabled.
+
+# Args:
+#     self: The property group or operator instance.
+#     context: The Blender context.
+def chestToggle(self, context):
+    tbse_properties = context.scene.tbse_kit_properties
+    chest_shape = tbse_properties.chest_shape
+    modelDict = getTextBlock()
+
+    # Get object names of all chest models
+    tbse_neck = getModelsInList(modelDict, "body_neck")
+    body_chest = getModelsInList(modelDict, "body_chest")
+    body_chest_w = getModelsInList(modelDict, "body_chest_w")
+    body_chest_chonk = getModelsInList(modelDict, "body_chest_chonk")
+    body_chest_chonk1 = getModelsInList(modelDict, "body_chest_chonk1")
+    piercings_chest = getModelsInList(modelDict, "piercings_chest")
+    
+    # Hide all chest models
+    bpy.data.objects[tbse_neck[0]].hide_set(True)
+    for obj in body_chest: bpy.data.objects[obj].hide_set(True)
+    for obj in body_chest_w: bpy.data.objects[obj].hide_set(True)
+    for obj in body_chest_chonk: bpy.data.objects[obj].hide_set(True)
+    for obj in body_chest_chonk1: bpy.data.objects[obj].hide_set(True)
+    for obj in piercings_chest: bpy.data.objects[obj].hide_set(True)
+
+    # Show chest pieces if enabled
+    if tbse_properties['show_chest']:
+        bpy.data.objects[tbse_neck[0]].hide_set(False) # Enable neck
+        if chest_shape == 'w':
+            for obj in body_chest_w: bpy.data.objects[obj].hide_set(False)
+        elif chest_shape == 'chonk':
+            for obj in body_chest_chonk: bpy.data.objects[obj].hide_set(False)
+        elif chest_shape in ('chonk1', 'cub'):
+            for obj in body_chest_chonk1: bpy.data.objects[obj].hide_set(False)
+        else:
+            for obj in body_chest: bpy.data.objects[obj].hide_set(False)
+        if tbse_properties['show_piercings_chest']:
+            chestPiercingToggle(self, context)
+
+def legToggle(self, context):
+    """
+    Toggle visibility of all leg-related models based on user settings.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    leg_shape = tbse_properties.leg_shape
+    modelDict = getTextBlock()
+    body_legs = getModelsInList(modelDict, "body_legs")
+    body_legs_chonk = getModelsInList(modelDict, "body_legs_chonk")
+    body_genitals = getModelsInList(modelDict, "body_genitals")
+    # Hide all leg models
+    for obj in body_legs:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    for obj in body_legs_chonk:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    for obj in body_genitals:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    # Show leg pieces if enabled
+    if tbse_properties['show_legs']:
+        if leg_shape == 'chonk':
+            for obj in body_legs_chonk:
+                if obj in bpy.data.objects:
+                    bpy.data.objects[obj].hide_set(False)
+            setattr(tbse_properties, 'genital_toggle', 'amab')
+        else:
+            for obj in body_legs:
+                if obj in bpy.data.objects:
+                    bpy.data.objects[obj].hide_set(False)
+            # If LEG SHAPE is tbse xl, force amab legs and genital toggles
+            if tbse_properties.genital_toggle == 'amab' or leg_shape == 'xl':
+                if leg_shape == 'xl':
+                    setattr(tbse_properties, 'genital_toggle', 'amab')
+                if body_genitals and body_genitals[0] in bpy.data.objects:
+                    bpy.data.objects[body_genitals[0]].hide_set(False)
+            else:
+                if body_genitals and len(body_genitals) > 1 and body_genitals[1] in bpy.data.objects:
+                    bpy.data.objects[body_genitals[1]].hide_set(False)
+    # Update NSFW toggles after leg logic
+    nsfwToggle(self, context)
+
+def nsfwToggle(self, context):
+    """
+    Toggle visibility of all NSFW-related models based on user settings.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    modelDict = getTextBlock()
+    genitals_amab = getModelsInList(modelDict, "genitals_amab")
+    genitals_afab = getModelsInList(modelDict, "genitals_afab")
+    genitals_bpf = getModelsInList(modelDict, "genitals_bpf")
+    piercings_amab = getModelsInList(modelDict, "piercings_amab")
+    body_legs_chonk = getModelsInList(modelDict, "body_legs_chonk")
+    if body_legs_chonk and len(body_legs_chonk) > 3 and body_legs_chonk[3] in bpy.data.objects:
+        bpy.data.objects[body_legs_chonk[3]].hide_set(True)
+    for obj in genitals_amab:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    for obj in genitals_afab:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    for obj in genitals_bpf:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    for obj in piercings_amab:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    # Show NSFW pieces if enabled
+    if tbse_properties['show_nsfw']:
+        if tbse_properties.leg_shape == 'chonk' and tbse_properties['show_legs']:
+            if body_legs_chonk and len(body_legs_chonk) > 3 and body_legs_chonk[3] in bpy.data.objects:
+                bpy.data.objects[body_legs_chonk[3]].hide_set(False)
+        else:
+            genitalSet(self, context)
+        if tbse_properties['show_piercings_amab']:
+            amabPiercingToggle(self, context)
+
+def handToggle(self, context):
+    """
+    Toggle visibility of hand models based on user settings.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    modelDict = getTextBlock()
+    body_hands = getModelsInList(modelDict, "body_hands")
+    if body_hands and body_hands[0] in bpy.data.objects:
+        bpy.data.objects[body_hands[0]].hide_set(not tbse_properties['show_hands'])
+
+def feetGearToggle(self, context) -> None:
+    """
+    Toggle visibility of feet gear models in the scene based on the property value.
+    Args:
+        self: The property group instance.
+        context: Blender context.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    feet_list = context.scene.feet_gear_list
+    show_feet_gear = tbse_properties.show_feet_gear
+    for item in feet_list:
+        obj = item.obj_pointer
+        if obj:
+            obj.hide_set(not show_feet_gear)
+
+def genitalToggle(self, context):
+    """
+    Toggle visibility of genital models based on user settings and leg shape.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    modelDict = getTextBlock()
+    body_genitals = getModelsInList(modelDict, "body_genitals")
+    for obj in body_genitals:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    if tbse_properties.leg_shape == 'chonk':
+        return
+    elif tbse_properties.genital_toggle == 'amab' or tbse_properties.leg_shape == 'xl':
+        if body_genitals and body_genitals[0] in bpy.data.objects:
+            bpy.data.objects[body_genitals[0]].hide_set(False)
+    else:
+        if body_genitals and len(body_genitals) > 1 and body_genitals[1] in bpy.data.objects:
+            bpy.data.objects[body_genitals[1]].hide_set(False)
+    genitalSet(self, context)
+
+def bpfToggle(self, context):
+    """
+    Toggle visibility of BPF (body part fusion) models based on user settings.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    modelDict = getTextBlock()
+    genitals_bpf = getModelsInList(modelDict, "genitals_bpf")
+    if tbse_properties.leg_shape == 'chonk' or tbse_properties.leg_shape == 'xl':
+        return
+    elif tbse_properties['show_nsfw'] and tbse_properties['show_bpf'] and tbse_properties.genital_toggle == 'afab':
+        for obj in genitals_bpf:
+            if obj in bpy.data.objects:
+                bpy.data.objects[obj].hide_set(False)
+    else:
+        for obj in genitals_bpf:
+            if obj in bpy.data.objects:
+                bpy.data.objects[obj].hide_set(True)
+
+def genitalSet(self, context):
+    """
+    Set visibility of all genital models based on NSFW and leg settings.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    modelDict = getTextBlock()
+    genitals_amab = getModelsInList(modelDict, "genitals_amab")
+    genitals_afab = getModelsInList(modelDict, "genitals_afab")
+    genitals_bpf = getModelsInList(modelDict, "genitals_bpf")
+    for obj in genitals_amab:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    for obj in genitals_afab:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    for obj in genitals_bpf:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    if tbse_properties['show_nsfw'] and tbse_properties['show_legs']:
+        # If AMAB enabled, or LEG SHAPE is xl or chonk, allow AMAB models to show
+        if tbse_properties.genital_toggle == 'amab' or tbse_properties.leg_shape in ('xl', 'chonk'):
+            # Find specific AMAB type through enum value
+            amab_type_enum = tbse_properties.bl_rna.properties.get('amab_type')
+            if amab_type_enum:
+                index = amab_type_enum.enum_items.find(tbse_properties.amab_type)
+                if genitals_amab and index < len(genitals_amab) and genitals_amab[index] in bpy.data.objects:
+                    obj = genitals_amab[index]
+                    bpy.data.objects[obj].hide_set(False)
+        else:
+            if tbse_properties.afab_type == 'bbwvr':
+                if genitals_afab and genitals_afab[0] in bpy.data.objects:
+                    obj = genitals_afab[0]
+                    bpy.data.objects[obj].hide_set(False)
+            else:
+                if genitals_afab and len(genitals_afab) > 1 and genitals_afab[1] in bpy.data.objects:
+                    obj = genitals_afab[1]
+                    bpy.data.objects[obj].hide_set(False)
+            if tbse_properties['show_bpf']:
+                bpfToggle(self, context)
+            afab_driver(self, context)
+
+def chestPiercingToggle(self, context):
+    """
+    Toggle visibility of chest piercing models based on user settings.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    chest_toggles = context.scene.tbse_chest_toggles
+    modelDict = getTextBlock()
+    piercings_chest = getModelsInList(modelDict, "piercings_chest")
+    for obj in piercings_chest:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    if tbse_properties['show_piercings_chest']:
+        for prop_name, prop in chest_toggles.bl_rna.properties.items():
+            if isinstance(prop, bpy.types.BoolProperty):
+                if getattr(chest_toggles, prop_name):
+                    if prop_name in modelDict['piercings_chest']:
+                        obj = modelDict['piercings_chest'][prop_name]
+                        if obj in bpy.data.objects:
+                            bpy.data.objects[obj].hide_set(False)
+
+def amabPiercingToggle(self, context):
+    """
+    Toggle visibility of AMAB piercing models based on user settings.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    amab_toggles = context.scene.tbse_amab_toggles
+    modelDict = getTextBlock()
+    piercings_amab = getModelsInList(modelDict, "piercings_amab")
+    for obj in piercings_amab:
+        if obj in bpy.data.objects:
+            bpy.data.objects[obj].hide_set(True)
+    if tbse_properties['show_piercings_amab']:
+        for prop_name, prop in amab_toggles.bl_rna.properties.items():
+            if isinstance(prop, bpy.types.BoolProperty):
+                if getattr(amab_toggles, prop_name):
+                    if prop_name in modelDict['piercings_amab']:
+                        obj = modelDict['piercings_amab'][prop_name]
+                        if obj in bpy.data.objects:
+                            bpy.data.objects[obj].hide_set(False)
+
+
+# gear list toggles
+def gearListToggle(isEnabled, gearList):
+    for obj in gearList:
+        if isEnabled and obj.isEnabled: obj.obj_pointer.hide_set(False)
+        else: obj.obj_pointer.hide_set(True)
+
+def chestGearToggle(self,context):
+    tbse_properties = context.scene.tbse_kit_properties
+    gear_list = context.scene.chest_gear_list
+    gearListToggle(tbse_properties['show_chest_gear'], gear_list)
+
+def legGearToggle(self,context):
+    tbse_properties = context.scene.tbse_kit_properties
+    gear_list = context.scene.leg_gear_list
+    gearListToggle(tbse_properties['show_leg_gear'],gear_list)
+
+def handGearToggle(self,context):
+    tbse_properties = context.scene.tbse_kit_properties
+    gear_list = context.scene.hand_gear_list
+    gearListToggle(tbse_properties['show_hand_gear'],gear_list)
+
+def feetGearToggle(self, context) -> None:
+    """
+    Toggle visibility of feet gear models in the scene based on the property value.
+    Args:
+        self: The property group instance.
+        context: Blender context.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    feet_list = context.scene.feet_gear_list
+    show_feet_gear = tbse_properties.show_feet_gear
+    for item in feet_list:
+        obj = item.obj_pointer
+        if obj:
+            obj.hide_set(not show_feet_gear)
+
+#induvidual gear toggles
+def gearToggle(self, context) -> None:
+    """
+    Toggle visibility of individual gear items in the UI list.
+    Args:
+        self: The PropertyGroup item (e.g., ChestListItem, LegListItem, etc.).
+        context: Blender context.
+    """
+    obj = self.obj_pointer
+    if obj:
+        obj.hide_set(not self.isEnabled)
+
+# bone visibility toggles
+def boneToggles(self, context) -> None:
+    """
+    Toggle visibility of bone groups in the armature based on property values.
+    Args:
+        self: The property group instance.
+        context: Blender context.
+    """
+    tbse_properties = context.scene.tbse_kit_properties
+    armature = None
+    # Find the armature in the scene
+    for obj in context.scene.objects:
+        if obj.type == 'ARMATURE':
+            armature = obj
+            break
+    if not armature:
+        return
+    # Example: toggle bone layers (customize as needed)
+    # This assumes bone groups are mapped to armature layers
+    # You may need to adjust this logic for your specific rig
+    armature.data.layers[0] = tbse_properties.show_base_bones
+    armature.data.layers[1] = tbse_properties.show_skirt_bones
+    armature.data.layers[2] = tbse_properties.show_tail_bones
+    armature.data.layers[3] = tbse_properties.show_extra_bones
+    # IVCS layers (example indices)
+    armature.data.layers[16] = tbse_properties.show_ivcs_bones
+    armature.data.layers[17] = tbse_properties.show_ivcs2_bones
+
+
+# ========================== #
+#   DRIVERS FOR SHAPE KEYS   #
+# ========================== #
+
+# Currently supported bodies:
+    # TBSE
+    # Slim
+    # Type W
+    # SBTL
+    # SBTL-slimmer
+    # Twink
+    # Twunk
+    # Offseason Twunk
+    # Hunk
+    # Offseason Hunk
+    # Chonk
+    # Chonk 1.0
+    # Cub
+    # TBSE-XL
+# AMAB and AFAB Toggles available for all except Chonk + TBSE-XL
+
+# resets all chest shape keys back to TBSE (Basis)
+def chest_resetDrivers ():
+    for key in bpy.data.shape_keys["Chest Master"].key_blocks:
+        key.value = 0
+
+def chest_driver(self, context):
+    tbse_properties = context.scene.tbse_kit_properties
+    modelDict = getTextBlock()
+    # reset shape before changing to another shape
+    chest_resetDrivers()
+    index = 0
+    if not tbse_properties.chest_shape == 'tbse' : # if not default tbse, change shape depending on shape enum value
+        chest_type = tbse_properties.bl_rna.properties.get('chest_shape')
+        index = chest_type.enum_items.find(tbse_properties.chest_shape)
+        bpy.data.shape_keys["Chest Master"].key_blocks[index].value = 1
+    # chest model logic in case shape was changed to/from chonk or w
+    chestToggle(self,context)
+
+    # create list of object names of all models with chest shapekeys
+    modelList = getModelsInList(modelDict, "body_chest")
+    modelList.extend(getModelsInList(modelDict, "gear_chest"))
+    modelList.extend(getModelsInList(modelDict, "gear_hands"))
+
+    # change all objects with chest shapekeys to selected shape as active key
+    chest_shape = tbse_properties.chest_shape
+    for obj in modelList: 
+        shp_index = index
+        # if models are the elbows and wrists, change index to appropriate type
+        if obj == modelList[1] or obj == modelList[2]:
+            slim = ['slim','sbtl','sbtlslimmer']
+            hunk = ['hunk','offhunk']
+            if chest_shape in slim: shp_index = 1
+            elif chest_shape in hunk: shp_index = 2
+            elif chest_shape == 'xl': shp_index = 3
+            else: shp_index = 0
+        bpy.data.objects[obj].active_shape_key_index = shp_index
+
+# resets all leg shape keys back to TBSE (Basis)
+def leg_resetDrivers ():
+    for key in bpy.data.shape_keys["Leg Master"].key_blocks:
+        key.value = 0
+
+def leg_driver(self, context):
+    tbse_properties = context.scene.tbse_kit_properties
+    modelDict = getTextBlock()
+
+    # reset shape before changing to another shape
+    leg_resetDrivers()
+    index = 0
+    if not tbse_properties.leg_shape == 'tbse' : # if not default tbse, change shape depending on shape enum value
+        leg_type = tbse_properties.bl_rna.properties.get('leg_shape')
+        index = leg_type.enum_items.find(tbse_properties.leg_shape)
+        bpy.data.shape_keys["Leg Master"].key_blocks[index].value = 1
+    # leg model logic in case shape was changed to or from chonk
+    legToggle(self,context)
+
+    # create list of object names of all models with leg shapekeys
+    modelList = getModelsInList(modelDict, "body_legs")
+    modelList.extend(getModelsInList(modelDict, "gear_legs"))
+    modelList.extend(getModelsInList(modelDict, "gear_feet"))
+
+    # change all objects with leg shapekeys to selected shape as active key
+    leg_shape = tbse_properties.leg_shape
+    for obj in modelList: 
+        shp_index = index
+        # if models are the shin and knee, change index to appropriate type
+        if obj == modelList[0] or obj == modelList[1]:
+            hunk_stbl = ['hunk','sbtl']
+            if leg_shape in hunk_stbl: shp_index = 1
+            elif leg_shape == 'xl': shp_index = 2
+            else: shp_index = 0
+        bpy.data.objects[obj].active_shape_key_index = shp_index
+
+# resets all afab shape keys back to Gen A (Basis)
+def afab_ResetDrivers():
+    for key in bpy.data.shape_keys["AFAB Master"].key_blocks:
+        key.value = 0
+
+def afab_driver(self, conxtext):
+    tbse_properties = conxtext.scene.tbse_kit_properties
+    # resets shape before changing to another shape
+    afab_ResetDrivers()
+    if not tbse_properties.afab_type == 'a' : # if not default Gen A, change shape depending on shape enum value
+        afab_shape = tbse_properties.bl_rna.properties.get('afab_type')
+        index = afab_shape.enum_items.find(tbse_properties.afab_type)
+        bpy.data.shape_keys["AFAB Master"].key_blocks[index].value = 1 
+  
+
+# =================== #
+#   RENAMING MODELS   #
+# =================== #
+
+class TBSEKIT_OT_rename(Operator):
+    bl_idname = "object.renaming"
+    bl_label = "Rename"
+    bl_description = "This allows for bulk renaming of models, changing all models to Part X.Z to Part Y.Z"
+    bl_options = {'REGISTER','UNDO'}
+
+    def execute(self, context):
+        scene = context.scene
+        tbse_properties =  scene.tbse_kit_properties
+        partNumber = tbse_properties["partNumber"]
+        rename = tbse_properties.rename_options
+        # gets json code
+        modelDict = getTextBlock()
+        modelList = []
+        
+        if rename == 'chest': 
+            # create a list of obj names
+            modelList = getModelsInList(modelDict, "body_neck")
+            modelList.extend(getModelsInList(modelDict, "body_chest"))
+            modelList.extend(getModelsInList(modelDict, "body_chest_w"))
+            modelList.extend(getModelsInList(modelDict, "body_chest_chonk"))
+        if rename == 'legs':
+            modelList = getModelsInList(modelDict, "body_legs")
+            modelList.extend(getModelsInList(modelDict, "body_legs_chonk"))
+            modelList.extend(getModelsInList(modelDict, "body_genitals"))
+            modelList.extend(getModelsInList(modelDict, "genitals_amab"))
+            modelList.extend(getModelsInList(modelDict, "genitals_afab"))
+        if rename == 'hands': modelList = getModelsInList(modelDict, "body_hands")
+        if rename == 'feet': modelList = getModelsInList(modelDict, "body_feet")
+        if rename == 'chest_piercings': modelList = getModelsInList(modelDict, "piercings_chest")
+        if rename == 'amab_piercings': modelList = getModelsInList(modelDict, "piercings_amab")
+        if rename == 'bpf': modelList = getModelsInList(modelDict, "genitals_bpf")
+
+        modelDict = renameModels(modelDict, modelList, partNumber)
+
+        if rename == 'chest_gear': modelDict = renameGear(modelDict, scene.chest_gear_list, partNumber)
+        if rename == 'leg_gear': modelDict = renameGear(modelDict, scene.leg_gear_list, partNumber)
+        if rename == 'hand_gear': modelDict = renameGear(modelDict, scene.hand_gear_list, partNumber)
+        if rename == 'feet_gear': modelDict = renameGear(modelDict, scene.feet_gear_list, partNumber)
+
+        if rename == 'selected':
+            selected_objects = context.selected_objects
+            for obj in selected_objects:
+                split = obj.name.lower()
+                index = split.find("part") + 5
+                new = obj.name[:index] + str(partNumber) + obj.name[index+1:]
+                obj.name = new
+        
+        if not rename == 'selected': setTextBlock(modelDict)
+
+        return {'FINISHED'}
+    
+def renameModels(modelDict, modelList, partNumber):
+    for name in modelList: # list of obj names
+        obj = bpy.data.objects[name]
+        split = obj.name.lower()
+        index = split.find("part") + 5
+        new = obj.name[:index] + str(partNumber) + obj.name[index+1:]
+        obj.name = setModelName(modelDict, obj.name, new)
+    return modelDict
+
+def renameGear(modelDict, itemlist, partNumber):
+    for item in itemlist:
+        obj = item.obj_pointer
+        old = obj.name.lower()
+        index = old.find("part") + 5
+        new = obj.name[:index] + str(partNumber) + obj.name[index+1:]
+        item.name = new
+        item.model_name = new
+        obj.name = setModelName(modelDict, obj.name, new)
+    return modelDict
+
+def modelNameChange(self,context):
+    modelDict = getTextBlock()
+    obj = self.obj_pointer
+    if obj:
+        obj.name = setModelName(modelDict, obj.name, self.model_name)
+    setTextBlock(modelDict)
+
+
+# ============= # 
+#   FBX STUFF   #
+# ============= #
+
+class TBSEKIT_OT_importFBX(Operator, ImportHelper):
+    bl_idname = "object.importfbx"
+    bl_label = "Import FBX"
+    bl_description = "Bulk import FBXs with optimal setting for XIV modding"
+    bl_options = {'REGISTER','UNDO'}
+
+    filter_glob: StringProperty(default='*.fbx',options={'HIDDEN'})
+
+    files: CollectionProperty(
+            type=bpy.types.OperatorFileListElement,
+            options={'HIDDEN', 'SKIP_SAVE'},
+        )
+    
+    # CUSTOM OPTIONS
+    fix_skeleton: BoolProperty(
+        default=True,
+        name="Fix Skeleton",
+        description="Rotates bones of skeleton to make them more readable when editing.")
+    fix_materials: BoolProperty(
+        default=True,
+        name="Fix Materials",
+        description="Changes all materials to 'Alpha Hashed' and fixes metalics")
+    delete_junk: BoolProperty(
+        default=True,
+        name="Delete Junk",
+        description="Deletes all empty objects, importing only the mesh and armature")
+    auto_assign_armature: BoolProperty(
+        default=True,
+        name="Auto Assign Armature",
+        description="Deletes the armature that comes with the fbx and assigns all meshes to existing skeleton.\nRecommended to disable ONLY if fbx skeleton includes ex_ bones")
+    
+    def draw(self, context):
+        layout = self.layout
+
+        layout.label(text="== CUSTOM SETTINGS ==")
+        box = layout.box()
+        box.prop(self, 'fix_skeleton')
+        box.prop(self, 'fix_materials')
+        box.prop(self, 'delete_junk')
+        row = box.row()
+        row.prop(self, 'auto_assign_armature')
+        row = layout.row()
+        row.label(text="I recommended keeping all options enabled!")
+        row.enabled=False
+
+    def execute(self, context):
+        folder = os.path.dirname(self.filepath)
+
+        # OPTIONAL SETTING: rotates bone axis on imported skeleton
+        if self.fix_skeleton:
+            primary_axis = 'X'
+            second_axis = 'Y'
+        else:
+            primary_axis = 'Y'
+            second_axis = 'X'
+
+        for meshfile in self.files:
+            filepath = (os.path.join(folder, meshfile.name))
+            bpy.ops.import_scene.fbx(
+                filepath=filepath,
+                use_anim=False,
+                force_connect_children=True,
+                primary_bone_axis=primary_axis,
+                secondary_bone_axis=second_axis
+            )
+            importedfiles = context.selected_objects
+            cleanImport(self, importedfiles)
+
+        return {'FINISHED'}
+    
+# cleans up the imported mesh:
+    # clear parents
+    # [OPTIONAL] changes skeleton axis for easy viewing
+    # [OPTIONAL] removes unwanted empties
+    # [OPTIONAL] fixes alpha + metalic mat      # attributed code from MekTools with permission
+    # [OPTIONAL] assigns armature to existing 'Skeleton'
+def cleanImport(self, imported):
+    bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+
+    meshes = []
+    junk = []
+
+    # organizing all objects imported
+    for obj in imported:
+        obj.select_set(False)
+        if obj.type == 'MESH': meshes.append(obj)
+        elif obj.type == 'ARMATURE': armature = obj
+        else: junk.append(obj)
+    
+    for obj in meshes:
+        # Code for materials referenced from MekTools with permission
+        for mat in obj.data.materials: # loops through materials in obj
+            mat.blend_method = 'HASHED' # sets material blend to Alpha Hashed
+            # OPTIONAL SETTING: fix materials
+            if self.fix_materials:
+                if not mat.use_nodes:
+                    mat.metallic = 0
+                    continue
+                for n in mat.node_tree.nodes: # sets principled node's metalic to 0
+                    if n.type == 'BSDF_PRINCIPLED': n.inputs["Metallic"].default_value = 0
+        # OPTIONAL SETTING: auto assign armature
+        if self.auto_assign_armature:
+            if obj.vertex_groups:
+                for mod in obj.modifiers: 
+                    if mod.type == 'ARMATURE': mod.object = bpy.data.objects["Skeleton"]
+            armature.select_set(True)
+    # OPTIONAL SETTING: delete junk
+    if self.delete_junk:
+        for obj in junk: obj.select_set(True)
+    
+    bpy.ops.object.delete() # delete all objects still selected
+
+
+class TBSEKIT_OT_exportFBX(Operator, ExportHelper):
+    bl_idname = "object.exportfbx"
+    bl_label = "Export FBX"
+    bl_description = "Exports all FBXs selected with optimal settings for XIV modding"
+    bl_options = {'REGISTER','UNDO'}
+
+    filename_ext = ".fbx"
+    filter_glob: StringProperty(default='*.fbx',options={'HIDDEN'})
+
+    # CUSTOM OPTIONS
+    reset_skeleton: BoolProperty(
+        default=True,
+        name="Reset Skeleton",
+        description="Rotates bones of skeleton back to their original state.\nTechnically not needed but recommended if there's the chance of reimporting the FBX back into another blender file"
+    )
+    # bulk_export: BoolProperty(
+    #     default=False,
+    #     name="Bulk Export",
+    #     description="Bulk export models with selected shapekeys and gear types."
+    # )
+
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+    
+    def draw(self, context):
+        layout = self.layout
+
+        layout.label(text="== CUSTOM SETTINGS ==")
+        box = layout.box()
+        box.prop(self, 'reset_skeleton')
+
+
+    def execute(self, context):
+
+        if self.reset_skeleton: 
+            primary_axis = 'X'
+            second_axis = 'Y'
+        else:
+            primary_axis = 'Y'
+            second_axis = 'X'
+
+        bpy.ops.export_scene.fbx(
+            filepath=self.filepath,
+            use_selection=True,
+            use_triangles=True,
+            primary_bone_axis=primary_axis,
+            secondary_bone_axis=second_axis,
+            add_leaf_bones=False,
+            bake_anim=False
+        )
+        
+        return {'FINISHED'}
+
+
+# =============== #
+#   ADDING GEAR   #
+# =============== #
+
+# TO-DO : add more descriptions
+
+class TBSEKIT_UL_chestGear(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        
+        if self.layout_type in {'DEFAULT','COMPACT'}:
+            row = layout.row()
+            row.prop(item, "model_name", text="", emboss=False)
+            custom_icon = 'HIDE_ON'
+            if item.isEnabled: custom_icon='HIDE_OFF'
+            row.prop(item, "isEnabled", text="", icon=custom_icon)
+            if not context.scene.tbse_kit_properties['show_chest_gear']: row.enabled = False
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text="")
+
+class TBSEKIT_UL_legGear(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        
+        if self.layout_type in {'DEFAULT','COMPACT'}:
+            row = layout.row()
+            row.prop(item, "model_name", text="", emboss=False)
+            custom_icon = 'HIDE_ON'
+            if item.isEnabled: custom_icon='HIDE_OFF'
+            row.prop(item, "isEnabled", text="", icon=custom_icon)
+            if not context.scene.tbse_kit_properties['show_leg_gear']: row.enabled = False
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text="")
+
+class TBSEKIT_UL_handGear(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        
+        if self.layout_type in {'DEFAULT','COMPACT'}:
+            row = layout.row()
+            row.prop(item, "model_name", text="", emboss=False)
+            custom_icon = 'HIDE_ON'
+            if item.isEnabled: custom_icon='HIDE_OFF'
+            row.prop(item, "isEnabled", text="", icon=custom_icon)
+            if not context.scene.tbse_kit_properties['show_hand_gear']: row.enabled = False
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text="")
+
+class TBSEKIT_UL_feetGear(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        
+        if self.layout_type in {'DEFAULT','COMPACT'}:
+            row = layout.row()
+            row.prop(item, "model_name", text="", emboss=False)
+            custom_icon = 'HIDE_ON'
+            if item.isEnabled: custom_icon='HIDE_OFF'
+            row.prop(item, "isEnabled", text="", icon=custom_icon)
+            if not context.scene.tbse_kit_properties['show_feet_gear']: row.enabled = False
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text="")
+
+class TBSEKIT_OT_chestGearAdd(Operator):
+    bl_idname = "object.chest_gear_add"
+    bl_label = "Add selected gear model to chest gear list."
+    bl_description = "This adds chest shape keys to the object"
+    bl_options = {'REGISTER','UNDO'}
+
+    # only available when in object mode
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT'
+
+    def execute(self, context):
+        chest_list = context.scene.chest_gear_list
+        modelDict = getTextBlock()
+        # grab list of selected objects
+        selected_objects = context.selected_objects
+        # runs through list
+        for obj in selected_objects:
+            # check current list for dupes
+            isDupe = False
+            for list_obj in chest_list:
+                if list_obj.obj_pointer == obj: 
+                    isDupe = True
+                    break   # break for loop once a dupe is found [not needed, 'just optimal']
+            if not isDupe:  # if no dupe is found, add the object to the list
+                addGearList(obj, chest_list, bpy.data.shape_keys["Chest Master"])
+                addGearJson(obj, "chest_", modelDict, 'gear_chest')
+                
+        # set textblock with new items
+        # runs only once for optimization
+        setTextBlock(modelDict)
+
+        return {'FINISHED'}
+    
+class TBSEKIT_OT_chestGearRemove(Operator):
+    bl_idname = "object.chest_gear_remove"
+    bl_label = "Remove gear model from chest gear list."
+    bl_description = "THIS WILL REMOVE ALL SHAPEKEYS!"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.chest_gear_list and context.mode == 'OBJECT'
+
+    def execute(self, context):
+        chest_list = context.scene.chest_gear_list
+        index = context.scene.chest_gear_index
+        modelDict = getTextBlock()
+        
+        obj = chest_list[index].obj_pointer           # get object reference
+        removeShapeKeys(obj)                        # remove shapekeys
+        removeGearJson(obj, modelDict, 'gear_chest') # remove gear from json
+        chest_list.remove(index)                      # remove from UI List
+        context.scene.chest_gear_index = min(max(0, index - 1), len(chest_list) - 1)
+
+        return {'FINISHED'}
+    
+class TBSEKIT_OT_legGearAdd(Operator):
+    bl_idname = "object.leg_gear_add"
+    bl_label = "Add selected gear model to leg gear list"
+    bl_description = "This adds leg shape keys to the object"
+    bl_options = {'REGISTER','UNDO'}
+
+    # only available when in object mode
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT'
+
+    def execute(self, context):
+        leg_list = context.scene.leg_gear_list
+        modelDict = getTextBlock()
+
+        # gets list of all selected objects
+        selected_objects = context.selected_objects
+        # runs through list
+        for obj in selected_objects:
+            # check current list for dupes
+            isDupe = False
+            for list_obj in leg_list:
+                if list_obj.obj_pointer == obj: 
+                    isDupe = True
+                    break   # break for loop once a dupe is found [not needed, 'just optimal']
+            if not isDupe:  # if no dupe is found, add the object to the list
+                addGearList(obj, leg_list, bpy.data.shape_keys["Leg Master"])
+                addGearJson(obj, "leg_", modelDict, 'gear_legs')
+                
+        # set textblock with new items
+        # runs only once for optimization
+        setTextBlock(modelDict)
+        return {'FINISHED'}
+
+class TBSEKIT_OT_legGearRemove(Operator):
+    bl_idname = "object.leg_gear_remove"
+    bl_label = "Remove gear model from leg gear list"
+    bl_description = "THIS WILL REMOVE ALL SHAPEKEYS!"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.leg_gear_list and context.mode == 'OBJECT'
+
+    def execute(self, context):
+        leg_list = context.scene.leg_gear_list
+        index = context.scene.leg_gear_index
+        modelDict = getTextBlock()
+        
+        obj = leg_list[index].obj_pointer           # get object reference
+        removeShapeKeys(obj)                        # remove shapekeys
+        removeGearJson(obj, modelDict, 'gear_legs') # remove gear from json
+        leg_list.remove(index)                      # remove from UI List
+        context.scene.leg_gear_index = min(max(0, index - 1), len(leg_list) - 1)
+
+        return {'FINISHED'}
+
+class TBSEKIT_OT_handGearAdd(Operator):
+    bl_idname = "object.hand_gear_add"
+    bl_label = "Add selected gear model to hand gear list"
+    bl_description = "This adds chest shape keys to the object"
+    bl_options = {'REGISTER','UNDO'}
+
+    # only available when in object mode
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT'
+
+    def execute(self, context):
+        hand_list = context.scene.hand_gear_list
+        modelDict = getTextBlock()
+
+        # grab list of selected objects
+        selected_objects = context.selected_objects
+        # runs through list
+        for obj in selected_objects:
+            # check current list for dupes
+            isDupe = False
+            for list_obj in hand_list:
+                if list_obj.obj_pointer == obj: 
+                    isDupe = True
+                    break   # break for loop once a dupe is found [not needed, 'just optimal']
+            if not isDupe:  # if no dupe is found, add the object to the list
+                addGearList(obj, hand_list, bpy.data.shape_keys["Chest Master"])
+                addGearJson(obj, "hand_", modelDict, 'gear_hands')
+                
+        # set textblock with new items
+        # runs only once for optimization
+        setTextBlock(modelDict)
+
+        return {'FINISHED'}
+    
+class TBSEKIT_OT_handGearRemove(Operator):
+    bl_idname = "object.hand_gear_remove"
+    bl_label = "Remove gear model from hand gear list"
+    bl_description = "THIS WILL REMOVE ALL SHAPEKEYS!"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.hand_gear_list and context.mode == 'OBJECT'
+
+    def execute(self, context):
+        hand_list = context.scene.hand_gear_list
+        index = context.scene.hand_gear_index
+        modelDict = getTextBlock()
+        
+        obj = hand_list[index].obj_pointer           # get object reference
+        removeShapeKeys(obj)                        # remove shapekeys
+        removeGearJson(obj, modelDict, 'gear_hands') # remove gear from json
+        hand_list.remove(index)                      # remove from UI List
+        context.scene.hand_gear_index = min(max(0, index - 1), len(hand_list)-1)
+
+        return {'FINISHED'}
+
+class TBSEKIT_OT_feetGearAdd(Operator):
+    bl_idname = "object.feet_gear_add"
+    bl_label = "Add selected gear model to feet gear list"
+    bl_description = "This adds leg shape keys to the object"
+    bl_options = {'REGISTER','UNDO'}
+
+    # only available when in object mode
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT'
+
+    def execute(self, context):
+        feet_list = context.scene.feet_gear_list
+        modelDict = getTextBlock()
+
+        # grab list of selected objects
+        selected_objects = context.selected_objects
+        # runs through list
+        for obj in selected_objects:
+            # check current list for dupes
+            isDupe = False
+            for list_obj in feet_list:
+                if list_obj.obj_pointer == obj: 
+                    isDupe = True
+                    break   # break for loop once a dupe is found [not needed, 'just optimal']
+            if not isDupe:  # if no dupe is found, add the object to the list
+                addGearList(obj, feet_list, bpy.data.shape_keys["Leg Master"])
+                addGearJson(obj, "feet_", modelDict, 'gear_feet')
+                
+        # set textblock with new items
+        # runs only once for optimization
+        setTextBlock(modelDict)
+
+        return {'FINISHED'}
+    
+class TBSEKIT_OT_feetGearRemove(Operator):
+    bl_idname = "object.feet_gear_remove"
+    bl_label = "Remove gear model from feet gear list"
+    bl_description = "THIS WILL REMOVE ALL SHAPEKEYS!"
+    bl_options = {'REGISTER','UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.feet_gear_list and context.mode == 'OBJECT'
+
+    def execute(self, context):
+        feet_list = context.scene.feet_gear_list
+        index = context.scene.feet_gear_index
+        modelDict = getTextBlock()
+        
+        obj = feet_list[index].obj_pointer           # get object reference
+        removeShapeKeys(obj)                        # remove shapekeys
+        removeGearJson(obj, modelDict, 'gear_feet') # remove gear from json
+        feet_list.remove(index)                      # remove from UI List
+        context.scene.feet_gear_index = min(max(0, index - 1), len(feet_list) - 1)
+
+        return {'FINISHED'}    
+
+# add shapekeys to obj with master controller as reference
+def addShapeKeys(obj, master):
+    # if no shape keys, add first driver as TBSE
+    if obj.data.shape_keys:
+        if obj.data.shape_keys.key_blocks[0].name == 'Basis':
+            obj.data.shape_keys.key_blocks['Basis'].name = 'TBSE'
+    else: obj.shape_key_add(name='TBSE', from_mix=False)
+
+    # loop through the master keys for each shape key
+    for key in master.key_blocks:
+        # check if the same shape key is in obj
+        if not obj.data.shape_keys.key_blocks.get(key.name):
+            # if not add shape key
+            obj.shape_key_add(name=key.name, from_mix=False)
+        # add driver to everything except TBSE 'Basis'
+        if key.name != 'TBSE': addDrivers(obj, key, master)
+
+# add drivers to obj shapekeys with master controller as reference
+def addDrivers(obj, key, master):
+    # create new driver. it will never make another so no check is needed
+    newDriver = obj.data.shape_keys.key_blocks[key.name].driver_add('value').driver
+    newDriver.type = 'AVERAGE'
+    # check if there is a variable within the driver
+    if len(newDriver.variables) == 0: # if no variables, create one
+        var = newDriver.variables.new()
+        var.name = 'value'
+        var.type = 'SINGLE_PROP'
+        var.targets[0].id_type = 'KEY'
+        var.targets[0].id = master
+        var.targets[0].data_path = 'key_blocks["' + key.name + '"].value'
+
+# adds obj to UIList collection
+def addGearList(obj, gearlist, master):
+    new_obj = gearlist.add()            # adds gear to gear list
+    new_obj.model_name = obj.name       # change list entry to obj name
+    new_obj.obj_pointer = obj           # points list entry to obj
+    addShapeKeys(obj, master)           # add shape keys
+    obj.use_shape_key_edit_mode = True  # set obj to allow shape key edits for editing
+
+# adds obj to Json
+def addGearJson(obj, prefix, modelDict, modelGroupKey):
+    length = len(modelDict[modelGroupKey])          # get length of current model group dictionary
+    modelKey = prefix + str(length + 1)             # create modelKey name using length
+    # attempt to add obj name using key
+    modelDict[modelGroupKey].setdefault(modelKey, obj.name) 
+    # if there is already a key with the same name (can happen if items are deleted out of order)
+    # it will not add the current item to the dictionary
+    # length will stay the same if nothing was added
+    index = 0
+    while len(modelDict[modelGroupKey]) == length:  # loops until space is found in dict
+        modelKey = prefix + str(index + 1)          # attempts from 1
+        modelDict[modelGroupKey].setdefault(modelKey, obj.name)
+        index += 1
+
+# removes shapekeys from obj
+def removeShapeKeys(obj):
+    """
+    Remove all shape keys from the given object.
+    Args:
+        obj: Blender object to remove shape keys from.
+    """
+    if obj and obj.data.shape_keys:
+        # Remove all shape keys except 'Basis' (or TBSE)
+        key_blocks = obj.data.shape_keys.key_blocks
+        for key in list(key_blocks):
+            if key.name != 'Basis' and key.name != 'TBSE':
+                obj.shape_key_remove(key)
+
+# remove gear from json list 
+def removeGearJson(obj, modelDict, modelGroupKey):
+    """
+    Remove the gear entry for the given object from the model dictionary JSON.
+    Args:
+        obj: Blender object to remove from JSON.
+        modelDict: The model dictionary.
+        modelGroupKey: The group key in the dictionary.
+    """
+    if obj:
+        modelkey = getModelKey(modelDict, obj.name)
+        if modelkey:
+            try:
+                del modelDict[modelGroupKey][modelkey]
+                setTextBlock(modelDict)
+            except Exception:
+                pass
+
+def selectChestGear(self,context):
+    gearList = context.scene.chest_gear_list
+    index = context.scene.chest_gear_index
+    selectGear(gearList, index)
+
+def selectLegGear(self,context):
+    gearList = context.scene.leg_gear_list
+    index = context.scene.leg_gear_index
+    selectGear(gearList, index)
+
+def selectHandGear(self,context):
+    gearList = context.scene.hand_gear_list
+    index = context.scene.hand_gear_index
+    selectGear(gearList, index)
+
+def selectFeetGear(self,context):
+    gearList = context.scene.feet_gear_list
+    index = context.scene.feet_gear_index
+    selectGear(gearList, index)
+
+def selectGear (gearList, index):
+    # deselect all objects 
+    for obj in bpy.context.selected_objects: obj.select_set(False)
+    if index >= 0:
+        obj = gearList[index].obj_pointer           # gets object
+        obj.select_set(True)                        # selects object
+        bpy.context.view_layer.objects.active = obj # sets object as active
+
+# ============================= #
+#   JSON DICTIONARY FUNCTIONS   #
+# ============================= #
+
+"""
+JSON Dictionary Functions
+------------------------
+These functions manage persistent model data in the Blender .blend file using a text block named ".models".
+They provide lookup, update, and error handling for model names and groups.
+"""
+
+def getTextBlock() -> Dict[str, Dict[str, str]]:
+    """
+    Retrieve the persistent model dictionary from the .blend file's .models text block.
+    Returns:
+        Dictionary of model groups and their model names.
+    Raises:
+        RuntimeError: If the .models text block is missing or invalid.
+    """
+    rawTextBlock = bpy.data.texts.get(".models")
+    if not rawTextBlock:
+        raise RuntimeError(".models text block not found in this .blend file.")
+    stringBlock = rawTextBlock.as_string()
+    try:
+        return json.loads(stringBlock)
+    except Exception as e:
+        raise RuntimeError(f"Failed to parse .models text block: {e}")
+
+def setTextBlock(modelDict: Dict[str, Dict[str, str]]) -> None:
+    """
+    Save the model dictionary back to the .models text block in the .blend file.
+    Args:
+        modelDict: Dictionary of model groups and their model names.
+    Raises:
+        RuntimeError: If the .models text block is missing.
+    """
+    rawTextBlock = bpy.data.texts.get(".models")
+    if not rawTextBlock:
+        raise RuntimeError(".models text block not found in this .blend file.")
+    toJSON = json.dumps(modelDict, indent=4)
+    rawTextBlock.from_string(toJSON)
+
+def getModelsInList(modelDict: Dict[str, Dict[str, str]], key: str) -> List[str]:
+    """
+    Get a list of model names from a given model group key.
+    Args:
+        modelDict: The main model dictionary.
+        key: The model group key.
+    Returns:
+        List of model names (strings).
+    Raises:
+        KeyError: If the key is not found in the dictionary.
+    """
+    if key not in modelDict:
+        return []
+    return list(modelDict[key].values())
+
+def getModelGroupKey(modelDict: Dict[str, Dict[str, str]], obj_name: str) -> Optional[str]:
+    """
+    Find the model group key for a given object name.
+    Args:
+        modelDict: The main model dictionary.
+        obj_name: The object name to search for.
+    Returns:
+        The model group key if found, else None.
+    """
+    for modelGroup, subDict in modelDict.items():
+        for key, name in subDict.items():
+            if name == obj_name:
+                return modelGroup
+    return None
+
+def getModelKey(modelDict: Dict[str, Dict[str, str]], obj_name: str) -> Optional[str]:
+    """
+    Find the model key for a given object name.
+    Args:
+        modelDict: The main model dictionary.
+        obj_name: The object name to search for.
+    Returns:
+        The model key if found, else None.
+    """
+    for modelGroup, subDict in modelDict.items():
+        for key, name in subDict.items():
+            if name == obj_name:
+                return key
+    return None
+
+def setModelName(modelDict: Dict[str, Dict[str, str]], old: str, new: str) -> str:
+    """
+    Set the model name for a given object in the model dictionary.
+    Args:
+        modelDict: The main model dictionary.
+        old: The old object name.
+        new: The new object name.
+    Returns:
+        The new object name if successful.
+    Raises:
+        KeyError: If the object name is not found in the dictionary.
+    """
+    modelGroupKey = getModelGroupKey(modelDict, old)
+    modelKey = getModelKey(modelDict, old)
+    if not modelGroupKey or not modelKey:
+        raise KeyError(f"Object name '{old}' not found in model dictionary.")
+    modelDict[modelGroupKey][modelKey] = new
+    return modelDict[modelGroupKey][modelKey]
+
+
+# ================== #
+#   DEFINING STUFF   #
+# ================== #
+print("hiiii") # this was for testing but im keeping it here so i can feel some joy again everytime i build
+
+class TBSEKIT_TBSEProperties(PropertyGroup):
+    # bools for all model visibility
+    show_chest:             BoolProperty(default=True,  update=chestToggle) 
+    show_legs:              BoolProperty(default=True,  update=legToggle)
+    show_nsfw:              BoolProperty(default=False, update=nsfwToggle)
+    show_hands:             BoolProperty(default=True,  update=handToggle)
+    show_feet:              BoolProperty(default=True,  update=feetToggle)
+    show_bpf:               BoolProperty(default=True,  update=bpfToggle)
+    show_piercings_chest:   BoolProperty(default=False, update=chestToggle)
+    show_piercings_amab:    BoolProperty(default=False, update=nsfwToggle)
+
+    # enum of all chest types
+    chest_shape: EnumProperty(
+        name="Chest Shapes",
+        description="Toggle between all chest shapes.",
+        update=chest_driver,
+        items=[
+            ('tbse',        "TBSE",             "Original body shape created by Tsar"),
+            ('slim',        "Slim",             "Body edit created by Mimi"),
+            ('w',           "Type W",           "Body edit created by Westlaketea"),
+            ('sbtl',        "SBTL",             "Body edit created by Chibi + LunarEclipse"),
+            ('sbtlslimmer', "SBTL Slim",        "Body edit created by Chibi + LunarEclipse"),
+            ('twink',       "Twink",            "Body edit created by Red"),
+            ('twunk',       "Twunk",            "Body edit created by Red"),
+            ('hunk',        "Hunk",             "Body edit created by Red"),
+            ('offtwunk',    "Off-season Twunk", "Body edit created by Red"),
+            ('offhunk',     "Off-season Hunk",  "Body edit created by Red"),
+            ('chonk',       "Chonk",            "Body edit created by Nick"),
+            ('chonk1',      "Chonk 1.0",        "Body edit created by Nick"),
+            ('cub',         "Cub",              "Body edit created by Nick"),
+            ('xl',          "TBSE XL",          "Body edit created by Cheembs"),
+        ]
+    )
+    # enum of all leg types
+    leg_shape: EnumProperty(
+        name="Leg Shapes",
+        description="Toggle between all leg shapes.",
+        update=leg_driver,
+        items=[
+            ('tbse',    "TBSE",     "Original leg shape created by Tsar"),
+            ('twink',   "Twink",    "Leg edit created by Red"),
+            ('sbtl',    "SBTL",     "Leg edit created by Chibi + LunarEclipse"),
+            ('hunk',    "Hunk",     "Leg edit created by Red"),
+            ('chonk',   "Chonk",    "Leg edit created by Nick"),
+            ('xl',      "TBSE XL",  "Leg edit created by Cheembs")
+        ]
+    )
+    # enum of genital types
+    genital_toggle: EnumProperty(
+        name="Genital Type",
+        description="Toggle between AMAB and AFAB.",
+        update=genitalToggle,
+        items=[ 
+            ('amab',    "AMAB",     ""),
+            ('afab',    "AFAB",     "")
+            ]
+    )
+    # enum of AMAB gential types
+    amab_type: EnumProperty(
+        name="AMAB Type",
+        description="Toggle between different AMAB gential types.",
+        update=genitalSet,
+        items=[
+            ('a',       "Gen A",    ""),
+            ('b',       "Gen B",    ""),
+            ('c',       "Gen C",    ""),
+            ('d',       "Gen D",    ""),
+            ('squish',  "Squish", "Used for nsfw outfits that would show part of the amab model but squished while in an outfit.")
+            ]
+    )
+    # enum of AFAB gential types
+    afab_type: EnumProperty(
+        description="Toggle between different AFAB gential types.",
+        update=genitalSet,
+        items=[
+            ('a',       "Gen A",    ""),
+            ('b',       "Gen B",    ""),
+            ('c',       "Gen C",    ""),
+            ('bbwvr',   "BBWVR",    "")
+            ]
+    )
+
+    # options for renaming models
+    rename_options: EnumProperty(
+        name="Renaming Models",
+        description="Options groups for renaming models",
+        items = [
+            ('chest',           "Chest Models",         ""),
+            ('legs',            "Leg Models",           ""),
+            ('hands',           "Hand Models",          ""),
+            ('feet',            "Feet Models",          ""),
+            ('chest_piercings', "Chest Piercings",      ""),
+            ('amab_piercings',  "AMAB Piercings",       ""),
+            ('bpf',             "BPF Models",           ""),
+            ('chest_gear',      "Chest Gear Models",    ""),
+            ('leg_gear',        "Leg Gear Models",      ""),
+            ('hand_gear',       "Hand Gear Models",     ""),
+            ('feet_gear',       "Feet Gear Models",     ""),
+            ('selected',        "Selected Models Only", "")
+        ]
+    )
+    # part/group option for renaming models
+    partNumber: IntProperty(default=0,min=0)
+    # bools for all gear pieces
+    show_chest_gear:        BoolProperty(default=True,  update=chestGearToggle)
+    show_leg_gear:          BoolProperty(default=True,  update=legGearToggle)
+    show_hand_gear:         BoolProperty(default=True,  update=handGearToggle)
+    show_feet_gear:         BoolProperty(default=True,  update=feetGearToggle)
+
+    # bools for all bone groups
+    show_armature:          BoolProperty(default=True,  update=boneToggles)
+    show_base_bones:        BoolProperty(default=True,  update=boneToggles)
+    show_skirt_bones:       BoolProperty(default=True,  update=boneToggles)
+    show_extra_bones:       BoolProperty(default=True,  update=boneToggles)
+    show_tail_bones:        BoolProperty(default=True,  update=boneToggles)
+    show_ivcs_bones:        BoolProperty(default=False, update=boneToggles)
+    show_ivcs2_bones:       BoolProperty(default=False, update=boneToggles)
+
+class TBSEKIT_chestPiercingToggles(PropertyGroup):
+    nipple_ring:        BoolProperty(name="Nipple Ring",    default=True, update=chestPiercingToggle)
+    nipple_bar:         BoolProperty(name="Nipple Bar",     default=True, update=chestPiercingToggle)
+    nipple_spike:       BoolProperty(name="Nipple Spike",   default=True, update=chestPiercingToggle)
+    navel_bar:          BoolProperty(name="Navel Bar",      default=True, update=chestPiercingToggle)
+    navel_spike:        BoolProperty(name="Navel Spike",    default=True, update=chestPiercingToggle)
+    hip_bar:            BoolProperty(name="Hip Bar",        default=True, update=chestPiercingToggle)
+    hip_spike:          BoolProperty(name="Hip Spike",      default=True, update=chestPiercingToggle)
+
+class TBSEKIT_AMABPiercingToggles(PropertyGroup):
+    jacob_piercing:     BoolProperty(name="Jacob's Ladder", default=True, update=amabPiercingToggle)
+    albert_piercing:    BoolProperty(name="Prince Albert",  default=True, update=amabPiercingToggle)
+
+class ChestListItem(PropertyGroup):
+    model_name:         StringProperty(name="Chest Model",
+                                       default="Empty Chest Piece",
+                                       update=modelNameChange)
+    obj_pointer:        PointerProperty(type=bpy.types.Object)
+    isEnabled:          BoolProperty(default=True, update=gearToggle)
+class LegListItem(PropertyGroup):
+    model_name:         StringProperty(name="Leg Model",
+                                       default="Empty Leg Piece",
+                                       update=modelNameChange)
+    obj_pointer:        PointerProperty(type=bpy.types.Object)
+    isEnabled:          BoolProperty(default=True, update=gearToggle)
+class HandListItem(PropertyGroup):
+    model_name:         StringProperty(name="Hand Model",
+                                       default="Empty Hand Piece",
+                                       update=modelNameChange)
+    obj_pointer:        PointerProperty(type=bpy.types.Object)
+    isEnabled:          BoolProperty(default=True, update=gearToggle)
+class FeetListItem(PropertyGroup):
+    model_name:         StringProperty(name="Feet Model",
+                                       default="Empty Feet Piece",
+                                       update=modelNameChange)
+    obj_pointer:        PointerProperty(type=bpy.types.Object)
+    isEnabled:          BoolProperty(default=True, update=gearToggle)
+
+# fuck me and my feature creep man wtf....
+class TBSEKIT_BulkExport(PropertyGroup):
+    
+    file_name:              StringProperty(default="Untitled")
+    iteration_ver:          IntProperty(default=1)
+
+    export_chest:           BoolProperty(default=False)
+    export_legs:            BoolProperty(default=False)
+    export_hands:           BoolProperty(default=False)
+    hands_with_arms:        BoolProperty(default=False)
+    export_feet:            BoolProperty(default=False)
+    feet_with_legs:        BoolProperty(default=False)
+
+    export_chest_tbse:      BoolProperty(default=True)
+    export_chest_slim:      BoolProperty(default=False)
+    export_chest_w:         BoolProperty(default=False)
+    export_chest_sblt:      BoolProperty(default=False)
+    export_chest_sbltslim:  BoolProperty(default=False)
+    export_chest_twink:     BoolProperty(default=False)
+    export_chest_twunk:     BoolProperty(default=False)
+    export_chest_hunk:      BoolProperty(default=False)
+    export_chest_offtwunk:  BoolProperty(default=False)
+    export_chest_offhunk:   BoolProperty(default=False)
+    export_chest_chonk1:    BoolProperty(default=False)
+    export_chest_chonk2:    BoolProperty(default=False)
+    export_chest_cub:       BoolProperty(default=False)
+    export_chest_xl:        BoolProperty(default=False)
+
+    export_legs_tbse:       BoolProperty(default=True)
+    export_legs_twink:      BoolProperty(default=False)
+    export_legs_sbtl:       BoolProperty(default=False)
+    export_legs_hunk:       BoolProperty(default=False)
+    export_legs_chonk:      BoolProperty(default=False)
+    export_legs_xl:         BoolProperty(default=False)
+
+    # will pick ONLY THE ONE shape currently toggled for each
+    export_nsfw_amab:       BoolProperty(default=True)
+    export_nsfw_afab:       BoolProperty(default=False)
+
+    with_nsfw:              BoolProperty(default=False)
+    with_chest_piercings:   BoolProperty(default=False)
+    with_amab_piercings:    BoolProperty(default=False)
+
+
+# ============= #
+#   UI SET UP   #
+# ============= #
+
+# parent class for all panel UIs
+class TBSEKIT_View3DPanel:
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "Body Kit"
+
+# Main panel
+class TBSEKIT_PT_mainPanel(TBSEKIT_View3DPanel, bpy.types.Panel):
+    "UI for 3D View"
+    bl_label = "TBSE Body Kit"
+    bl_idname = 'TBSEKIT_PT_mainPanel_id'
+
+    def draw(self, context):
+        layout = self.layout
+
+        box = layout.box()
+        row = box.row()
+        row.operator('object.importfbx',icon='IMPORT',text="Import FBX")
+        row.operator('object.exportfbx',icon='EXPORT',text="Export FBX")
+        # resets all shape keys, models, and toggles to default
+        # chest, legs, hands, and feet enabled. nsfw disabled
+        # shape keys and models set to base tbse
+        layout.operator("object.set_to_default", icon="LOOP_BACK", text="Reset to Default")
+
+# Body part model toggles panel
+class TBSEKIT_PT_modelPanel(TBSEKIT_View3DPanel, Panel):
+    bl_label = ""
+    bl_idname = 'TBSEKIT_PT_modelPanel_id'
+    bl_parent_id = 'TBSEKIT_PT_mainPanel_id'
+    bl_options = {'HIDE_HEADER'}
+
+    def draw(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+        layout = self.layout
+
+        # layout.operator("object.set_to_default", icon="LOOP_BACK", text="Reset to Default")
+
+        box = layout.box()
+        row = box.row()
+        if tbse_properties['show_chest']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row.prop(tbse_properties,'show_chest',text="",icon=custom_icon)
+        split = row.split(factor=0.40)
+        split.label(text="Chest Shapes:")
+        split.prop(tbse_properties,'chest_shape',text="")
+        if not tbse_properties['show_chest']: split.enabled = False
+
+        row = box.row()
+        if tbse_properties['show_legs']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row.prop(tbse_properties,'show_legs',text="",icon=custom_icon)
+        split = row.split(factor=0.40)
+        split.label(text="Leg Shapes:")
+        split.prop(tbse_properties,'leg_shape',text="")
+        if not tbse_properties['show_legs']: split.enabled = False
+
+        row = box.row()
+        if tbse_properties['show_nsfw']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        if not tbse_properties['show_legs']: custom_icon = 'HIDE_ON'
+        row.prop(tbse_properties,'show_nsfw',text="", icon=custom_icon)
+        split = row.split(factor=0.40)
+        split.label(text="Genital Type:")
+        split.prop(tbse_properties,'genital_toggle',text="")
+        if not tbse_properties['show_nsfw']: split.enabled = False
+
+        if not tbse_properties['show_legs']: row.enabled = False
+        else:
+            if tbse_properties['show_nsfw'] and tbse_properties.genital_toggle == 'amab':
+                split = box.split(factor=0.1)
+                col = split.column()
+                col = split.column()
+                row = col.row()
+                row.prop(tbse_properties,'amab_type',text="A",expand=True)
+            if tbse_properties['show_nsfw'] and tbse_properties.genital_toggle == 'afab':
+                split = box.split(factor=0.1)
+                col = split.column()
+                col = split.column()
+                row = col.row()
+                row.prop(tbse_properties,'afab_type',text="A",expand=True)
+                row = col.row()
+                if tbse_properties['show_bpf']: custom_icon='HIDE_OFF'
+                else: custom_icon = 'HIDE_ON'
+                row.prop(tbse_properties,'show_bpf',text="BPF",toggle=1,icon=custom_icon)
+
+        # hand model toggle
+        split = box.split()
+        row = split.row()
+        if tbse_properties['show_hands']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row.prop(tbse_properties,'show_hands',text="",icon=custom_icon)
+        subsplit = row.split(factor=0.40)
+        subsplit.label(text="Hands")
+        if not tbse_properties['show_hands']: subsplit.enabled = False
+
+        # feet model toggle
+        row = split.row()
+        if tbse_properties['show_feet']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row.prop(tbse_properties,'show_feet',text="",icon=custom_icon)
+        subsplit = row.split(factor=0.40)
+        subsplit.label(text="Feet")
+        if not tbse_properties['show_feet']: subsplit.enabled = False
+        
+        # Chest piercing toggles
+        split = box.split()
+        col = split.column()
+        row = col.row()
+        if tbse_properties['show_piercings_chest']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row.prop(tbse_properties,'show_piercings_chest',text="",icon=custom_icon)
+        row.label(text="Chest Piercings")
+        row = col.row()
+        row.menu('TBSEKIT_MT_chestPiercingMenu_id')
+        if not tbse_properties['show_piercings_chest']: row.enabled = False
+        if not tbse_properties['show_chest']: col.enabled = False
+
+        # AMAB piercing toggles
+        col = split.column()
+        row = col.row()
+        if tbse_properties['show_piercings_amab']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row.prop(tbse_properties,'show_piercings_amab',text="",icon=custom_icon)
+        row.label(text="AMAB Piercings")
+        row = col.row()
+        row.menu('TBSEKIT_MT_amabPiercingMenu_id')
+        if not tbse_properties['show_piercings_amab']: row.enabled = False
+        if not tbse_properties['show_nsfw'] or tbse_properties.genital_toggle != 'amab':
+            col.enabled = False
+        
+# Chest shape panel [UNUSED/OUTDATED]
+# Only shows if chest model is enabled
+class TBSEKIT_PT_chestPanel(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Chest Shapes:"
+    bl_idname = 'TBSEKIT_PT_chestPanel_id'
+    bl_parent_id = "TBSEKIT_PT_modelPanel_id"
+    bl_options = {'HIDE_HEADER'}
+
+    @classmethod
+    def poll(self,context):
+        tbse_properties = context.scene.tbse_kit_properties
+        # Do not show panel when chest model is hidden
+        return tbse_properties['show_chest'] 
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        tbse_propeties = scene.tbse_kit_properties
+
+        box = layout.box()
+        # split = box.split(factor=0.27)
+        # split.label(text="")
+        # split.label(text="Chest Shapes:")
+        row = box.row()
+        row.prop_enum(tbse_propeties,'chest_shape','tbse')
+        row.prop_enum(tbse_propeties,'chest_shape','slim')
+        row.prop_enum(tbse_propeties,'chest_shape','w')
+        row = box.row()
+        row.prop_enum(tbse_propeties,'chest_shape','sbtl')
+        row.prop_enum(tbse_propeties,'chest_shape','sbtlslimmer')
+        row = box.row()
+        row.prop_enum(tbse_propeties,'chest_shape','twink')
+        row.prop_enum(tbse_propeties,'chest_shape','twunk')
+        row.prop_enum(tbse_propeties,'chest_shape','hunk')
+        row = box.row()
+        row.prop_enum(tbse_propeties,'chest_shape','offtwunk')
+        row.prop_enum(tbse_propeties,'chest_shape','offhunk')
+        row = box.row()
+        row.prop_enum(tbse_propeties,'chest_shape','chonk')
+        row.prop_enum(tbse_propeties,'chest_shape','xl')
+
+# Leg shape panel [UNUSED/OUTDATED]
+# only shows if leg model is enabled
+class TBSEKIT_PT_legPanel(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Leg Shapes:"
+    bl_idname = 'TBSEKIT_PT_legPanel_id'
+    bl_parent_id = "TBSEKIT_PT_modelPanel_id"
+    bl_options = {'HIDE_HEADER'}
+
+    @classmethod
+    def poll(self,context):
+        tbse_properties = context.scene.tbse_kit_properties
+         # Do not show panel when leg model is hidden
+        return tbse_properties['show_legs']
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        tbse_propeties = scene.tbse_kit_properties
+        
+        box = layout.box()
+        # split = box.split(factor=0.3)
+        # split.label(text="")
+        # split.label(text="Leg Shapes:")
+        row = box.row()
+        row.prop_enum(tbse_propeties,'leg_shape','tbse')
+        row.prop_enum(tbse_propeties,'leg_shape','twink')
+        row.prop_enum(tbse_propeties,'leg_shape','sbtl')
+        row = box.row()
+        row.prop_enum(tbse_propeties,'leg_shape','hunk')
+        row.prop_enum(tbse_propeties,'leg_shape','chonk')
+        row.prop_enum(tbse_propeties,'leg_shape','xl')
+
+# NSFW shape panel [UNUSED/OUTDATED]
+# only shows if NSFW model is enabled
+class TBSEKIT_PT_nsfwPanel(TBSEKIT_View3DPanel, Panel):
+    bl_label = "NSFW Shapes:"
+    bl_idname = 'TBSEKIT_PT_nsfwPanel_id'
+    bl_parent_id = "TBSEKIT_PT_modelPanel_id"
+    bl_options = {'HIDE_HEADER'}
+
+    @classmethod
+    def poll(self,context):
+        tbse_properties = context.scene.tbse_kit_properties
+        # Do not show panel when NSFW models are hidden
+        return tbse_properties['show_nsfw']
+
+    def draw(self, context):
+        layout = self.layout
+        tbse_propeties = context.scene.tbse_kit_properties
+        
+        box = layout.box()
+        # split = box.split(factor=0.23)
+        # split.label(text="")
+        # split.label(text="Genital Shapes:")
+        row = box.row(align=True)
+        row.prop_enum(tbse_propeties,'genital_toggle','amab')
+        row.prop_enum(tbse_propeties,'genital_toggle','afab')
+        
+        # if amab toggled do this shit
+        if(tbse_propeties.genital_toggle == 'amab'):
+            row = box.row()
+            row.prop_enum(tbse_propeties,'amab_type','a')
+            row.prop_enum(tbse_propeties,'amab_type','b')
+            row.prop_enum(tbse_propeties,'amab_type','c')
+            row.prop_enum(tbse_propeties,'amab_type','d')
+
+        # if amab toggled do this shit
+        if(tbse_propeties.genital_toggle == 'afab'):
+            row = box.row()
+            row.prop_enum(tbse_propeties,'afab_type','bbwvr')
+            row.prop_enum(tbse_propeties,'afab_type','a')
+            row.prop_enum(tbse_propeties,'afab_type','b')
+            row.prop_enum(tbse_propeties,'afab_type','c')
+            row = box.row()
+            row.prop(tbse_propeties,'show_bpf',toggle=1,text="BPF Toggle")
+
+# Piercing model toggle panel [UNUSED/OUTDATED]
+# only shows if required body models are enabled
+class TBSEKIT_PT_piercingPanel(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Piercing Toggles [WIP]"
+    bl_parent_id = "TBSEKIT_PT_mainPanel_id"
+
+    @classmethod
+    def poll(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+        if tbse_properties['show_chest'] or tbse_properties["show_nsfw"]:
+            if tbse_properties["show_nsfw"] and tbse_properties['show_piercings_amab']:
+                if tbse_properties.genital_toggle == 'afab' : return False
+                else : return True
+            elif tbse_properties["show_nsfw"] and tbse_properties['show_piercings_chest']: return True
+        return False
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        tbse_properties = scene.tbse_kit_properties
+        chest_toggle = scene.tbse_chest_toggles
+        amab_toggle = scene.tbse_amab_toggles
+
+        split = layout.split(align=True)
+        row = split.row(align=True)
+        column = row.column(align=True)
+        column.label(text="Chest Piercings:")
+        box = column.box()
+        if not tbse_properties["show_chest"]: box.enabled = False
+        for piercing_toggle, piercing in chest_toggle.bl_rna.properties.items():
+                if piercing.is_runtime:
+                    box.prop(chest_toggle,piercing_toggle,text=piercing.name,toggle=1)
+        column = row.column(align=True)
+        column.label(text="AMAB Piercings:")
+        box = column.box()
+        if not (tbse_properties.genital_toggle == 'amab' and tbse_properties["show_nsfw"]): box.enabled = False
+        for piercing_toggle, piercing in amab_toggle.bl_rna.properties.items():
+                if piercing.is_runtime:
+                    box.prop(amab_toggle,piercing_toggle,text=piercing.name,toggle=1)
+        column = row.column(align=True)
+
+# Advanced panel
+# base panel used to hold advanced features:
+    # renaming models - body part options to chosen number
+        # options: chest, legs, hands, feet, chest piercings, amab piercings, bpf, selected
+    # adding gear pieces to the addon
+    # objects within the list can be:
+        # renamed
+        # selected
+        # toggled induvidually
+    # toggle bone group visibility
+class TBSEKIT_PT_advancedPanel(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Advanced Kit"
+    bl_idname = 'TBSEKIT_PT_advancedPanel_id'
+
+    def draw(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+
+        layout = self.layout
+        box = layout.box()
+        split = box.split(factor=0.75)
+        split.label(text="Renaming Models:")
+        split.label(text="Group:")
+        split = box.split(factor=0.75)
+        split.prop(tbse_properties,'rename_options',text="")
+        split.prop(tbse_properties,'partNumber',text="")
+        box.operator('object.renaming',text="Rename models")
+
+# Renaming panel [UNUSED/OUTDATED]
+class TBSEKIT_PT_renamePanel(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Renaming Models"
+    bl_idname = 'TBSEKIT_PT_renamePanel_id'
+    bl_parent_id = 'TBSEKIT_PT_advancedPanel_id'
+    bl_options = {'HIDE_HEADER'}
+
+    def draw(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+
+        layout = self.layout
+        box = layout.box()
+        split = box.split(factor=0.75)
+        split.label(text="Renaming Models:")
+        split.label(text="Group:")
+        split = box.split(factor=0.75)
+        split.prop(tbse_properties,'rename_options',text="")
+        split.prop(tbse_properties,'partNumber',text="")
+        box.operator('object.renaming',text="Rename models")
+
+# Gear model toggle panel [UNUSED/OUTDATED]
+class TBSEKIT_PT_gearToggle(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Renaming Models"
+    bl_idname = 'TBSEKIT_PT_gearToggle_id'
+    bl_parent_id = 'TBSEKIT_PT_advancedPanel_id'
+    bl_options = {'HIDE_HEADER'}
+
+    def draw(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+
+        layout = self.layout
+        box = layout.box()
+        box.label(text="Gear Toggles:")
+        row = box.row(align=True)
+        row.prop(tbse_properties, 'show_chest_gear', toggle=1, text="Chest")
+        row.prop(tbse_properties, 'show_leg_gear',   toggle=1, text="Leg")
+        row.prop(tbse_properties, 'show_hand_gear',  toggle=1, text="Hand")
+        row.prop(tbse_properties, 'show_feet_gear',  toggle=1, text="Feet")
+        return
+
+# Gear list panels
+# disabled in gear model is hidden
+class TBSEKIT_PT_chestGearList(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Chest Gear List"
+    bl_id = 'TBSEKIT_PT_chestGear_id'
+    bl_parent_id = 'TBSEKIT_PT_advancedPanel_id'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header_preset(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+
+        if tbse_properties['show_chest_gear']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row = self.layout.row(align=True)
+        row.prop(tbse_properties,'show_chest_gear',text="",icon=custom_icon)
+        
+    def draw(self, context):
+        scene = context.scene
+        tbse_properties = scene.tbse_kit_properties
+        layout = self.layout
+        row = layout.row()
+        row.template_list("TBSEKIT_UL_chestGear","chest_list",scene,
+                          "chest_gear_list",scene,"chest_gear_index")
+        col = row.column(align=True)
+        col.operator("object.chest_gear_add", icon='ADD', text="")
+        col.operator("object.chest_gear_remove", icon='REMOVE',text="")
+        if not tbse_properties['show_chest_gear']: layout.enabled = False
+
+class TBSEKIT_PT_legGearList(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Leg Gear List"
+    bl_id = 'TBSEKIT_PT_legGear_id'
+    bl_parent_id = 'TBSEKIT_PT_advancedPanel_id'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header_preset(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+
+        if tbse_properties['show_leg_gear']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row = self.layout.row(align=True)
+        row.prop(tbse_properties,'show_leg_gear',text="",icon=custom_icon)
+
+    def draw(self, context):
+        scene = context.scene
+        tbse_properties = scene.tbse_kit_properties
+        layout = self.layout
+        row = layout.row()
+        row.template_list("TBSEKIT_UL_legGear","leg_list",scene,
+                          "leg_gear_list",scene,"leg_gear_index")
+        col = row.column(align=True)
+        col.operator("object.leg_gear_add", icon='ADD', text="")
+        col.operator("object.leg_gear_remove", icon='REMOVE',text="")
+        if not tbse_properties['show_leg_gear']: layout.enabled = False
+
+class TBSEKIT_PT_handGearList(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Hand Gear List"
+    bl_id = 'TBSEKIT_PT_handGear_id'
+    bl_parent_id = 'TBSEKIT_PT_advancedPanel_id'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header_preset(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+
+        if tbse_properties['show_hand_gear']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row = self.layout.row(align=True)
+        row.prop(tbse_properties,'show_hand_gear',text="",icon=custom_icon)
+
+    def draw(self, context):
+        scene = context.scene
+        tbse_properties = scene.tbse_kit_properties
+        layout = self.layout
+        row = layout.row()
+        row.template_list("TBSEKIT_UL_handGear","hand_list",scene,
+                          "hand_gear_list",scene,"hand_gear_index")
+        col = row.column(align=True)
+        col.operator("object.hand_gear_add", icon='ADD', text="")
+        col.operator("object.hand_gear_remove", icon='REMOVE',text="")
+        if not tbse_properties['show_hand_gear']: layout.enabled = False
+
+class TBSEKIT_PT_feetGearList(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Feet Gear List"
+    bl_id = 'TBSEKIT_PT_feetGear_id'
+    bl_parent_id = 'TBSEKIT_PT_advancedPanel_id'
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header_preset(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+
+        if tbse_properties['show_feet_gear']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row = self.layout.row(align=True)
+        row.prop(tbse_properties,'show_feet_gear',text="",icon=custom_icon)
+
+    def draw(self, context):
+        scene = context.scene
+        tbse_properties = scene.tbse_kit_properties
+        layout = self.layout
+        row = layout.row()
+        row.template_list("TBSEKIT_UL_feetGear","feet_list",scene,
+                          "feet_gear_list",scene,"feet_gear_index")
+        col = row.column(align=True)
+        col.operator("object.feet_gear_add", icon='ADD', text="")
+        col.operator("object.feet_gear_remove", icon='REMOVE',text="")
+        if not tbse_properties['show_feet_gear']: layout.enabled = False
+
+class TBSEKIT_PT_boneGroups(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Bone Group Visibility"
+    bl_id = 'TBSEKIT_PT_feetGear_id'
+    bl_parent_id = 'TBSEKIT_PT_advancedPanel_id'
+    bl_options = {'HIDE_HEADER'}
+
+    def draw(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+        layout = self.layout
+
+        layout.separator(factor=0.1)
+        row = layout.row()
+        row.label(text="Bone Group Visibility")
+        if tbse_properties['show_armature']: custom_icon = 'HIDE_OFF'
+        else: custom_icon = 'HIDE_ON'
+        row.prop(tbse_properties,'show_armature',text="",icon=custom_icon)
+        box = layout.box()
+        row = box.row(align=True)
+        row.label(icon='ARMATURE_DATA')
+        row.label(text="Vanilla")
+        row.prop(tbse_properties,'show_base_bones',text="Base",toggle=1)
+        row.prop(tbse_properties,'show_skirt_bones',text="Skirt",toggle=1)
+        row.prop(tbse_properties,'show_tail_bones',text="Tail",toggle=1)
+        row.prop(tbse_properties,'show_extra_bones',text="Extra",toggle=1)
+        row = box.row(align=True)
+        row.label(icon='ARMATURE_DATA')
+        row.label(text=" IVCS")
+        row.prop(tbse_properties,'show_ivcs_bones',text="1.0",toggle=1)
+        row.prop(tbse_properties,'show_ivcs2_bones',text="2.0",toggle=1)
+
+        if not tbse_properties['show_armature']: box.enabled = False
+
+
+
+
+# testing panel - DO NOT MIND
+class TBSEKIT_PT_testingPanel(TBSEKIT_View3DPanel, Panel):
+    bl_label = "Help Me :'D"
+    bl_idname = 'TBSEKIT_PT_testing_id'
+
+    def draw(self, context):
+        tbse_properties = context.scene.tbse_kit_properties
+        layout = self.layout
+
+        layout.label(text="HI")
+        box = layout.box()
+        row = box.row()
+        row.operator('object.importfbx',icon='IMPORT',text="Import FBX")
+        row.operator('object.exportfbx',icon='EXPORT',text="Export FBX")
+        
+
+
+class TBSEKIT_MT_chestPiercingsMenu(TBSEKIT_View3DPanel, Menu):
+    bl_label = "Select"
+    bl_idname = 'TBSEKIT_MT_chestPiercingMenu_id'
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        chest_toggles = scene.tbse_chest_toggles
+
+        row = layout.row(align=True)
+        col = row.column(align=True)
+        for piercing_toggle, piercing in chest_toggles.bl_rna.properties.items():
+            if piercing.is_runtime:
+                col.prop(chest_toggles,piercing_toggle,text=piercing.name)
+
+class TBSEKIT_MT_amabPiercingsMenu(TBSEKIT_View3DPanel, Menu):
+    bl_label = "Select"
+    bl_idname = 'TBSEKIT_MT_amabPiercingMenu_id'
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        amab_toggles = scene.tbse_amab_toggles
+
+        row = layout.row(align=True)
+        col = row.column(align=True)
+        for piercing_toggle, piercing in amab_toggles.bl_rna.properties.items():
+            if piercing.is_runtime:
+                col.prop(amab_toggles,piercing_toggle,text=piercing.name)
+
+classes = (
+    TBSEKIT_TBSEProperties,
+    TBSEKIT_chestPiercingToggles,
+    TBSEKIT_AMABPiercingToggles,
+    ChestListItem,
+    LegListItem,
+    HandListItem,
+    FeetListItem,
+    TBSEKIT_OT_setToDefault,
+    TBSEKIT_OT_rename,
+    TBSEKIT_OT_importFBX,
+    TBSEKIT_OT_exportFBX,
+    TBSEKIT_UL_chestGear,
+    TBSEKIT_UL_legGear,
+    TBSEKIT_UL_handGear,
+    TBSEKIT_UL_feetGear,
+    TBSEKIT_OT_chestGearAdd,
+    TBSEKIT_OT_chestGearRemove,
+    TBSEKIT_OT_legGearAdd,
+    TBSEKIT_OT_legGearRemove,
+    TBSEKIT_OT_handGearAdd,
+    TBSEKIT_OT_handGearRemove,
+    TBSEKIT_OT_feetGearAdd,
+    TBSEKIT_OT_feetGearRemove,
+    TBSEKIT_PT_mainPanel,
+    TBSEKIT_PT_modelPanel,
+    # TBSEKIT_PT_chestPanel,
+    # TBSEKIT_PT_legPanel,
+    # TBSEKIT_PT_nsfwPanel,
+    # TBSEKIT_PT_piercingPanel,
+    TBSEKIT_PT_advancedPanel,
+    # TBSEKIT_PT_renamePanel,
+    # TBSEKIT_PT_gearToggle,
+    TBSEKIT_PT_chestGearList,
+    TBSEKIT_PT_legGearList,
+    TBSEKIT_PT_handGearList,
+    TBSEKIT_PT_feetGearList,
+    TBSEKIT_PT_boneGroups,
+    # TBSEKIT_PT_testingPanel,
+    TBSEKIT_MT_chestPiercingsMenu,
+    TBSEKIT_MT_amabPiercingsMenu,
+)
+
+
+def register():
+    for cls in classes: bpy.utils.register_class(cls)
+
+    Scene.tbse_kit_properties =     PointerProperty(type=TBSEKIT_TBSEProperties)
+    Scene.tbse_chest_toggles =      PointerProperty(type=TBSEKIT_chestPiercingToggles)
+    Scene.tbse_amab_toggles =       PointerProperty(type=TBSEKIT_AMABPiercingToggles)
+    Scene.chest_gear_list =         CollectionProperty(type=ChestListItem)
+    Scene.chest_gear_index =        IntProperty(default=0, update=selectChestGear)
+    Scene.leg_gear_list =           CollectionProperty(type=LegListItem)
+    Scene.leg_gear_index =          IntProperty(default=0, update=selectLegGear)
+    Scene.hand_gear_list =          CollectionProperty(type=HandListItem)
+    Scene.hand_gear_index =         IntProperty(default=0, update=selectHandGear)
+    Scene.feet_gear_list =          CollectionProperty(type=FeetListItem)
+    Scene.feet_gear_index =         IntProperty(default=0, update=selectFeetGear)
+
+def unregister():
+    for cls in classes: bpy.utils.unregister_class(cls)
+
+    del Scene.tbse_kit_properties
+    del Scene.tbse_chest_toggles
+    del Scene.tbse_amab_toggles
+    del Scene.chest_gear_list
+    del Scene.chest_gear_index
+    del Scene.leg_gear_list
+    del Scene.leg_gear_index
+    del Scene.hand_gear_list
+    del Scene.hand_gear_index
+    del Scene.feet_gear_list
+    del Scene.feet_gear_index
+
+if __name__ == '__main__':
+    register()
