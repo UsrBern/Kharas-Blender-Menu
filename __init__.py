@@ -2,7 +2,7 @@
 bl_info = {
     "name": "TBSE Body Kit",
     "author": "Crow, UsrBern",
-    "description": "Script to be used in conjunction with TBSE Upscale Kit. Includes multiple TBSE bodies. This is a refactored version of Crow's original addon.",
+    "description": "This is a refactored version of Crow's original scriptkid. Script to be used in conjunction with TBSE Upscale Kit. Includes multiple TBSE bodies.",
     "blender": (2, 80, 0),
     "version": (2, 0, 0),
     "location": "View3D > Sidebar > Body Kit",
