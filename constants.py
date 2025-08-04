@@ -8,15 +8,20 @@ MODEL_GROUPS = {
     'BODY_CHEST_CHONK': 'body_chest_chonk',
     'BODY_CHEST_CHONK1': 'body_chest_chonk1',
     'BODY_LEGS': 'body_legs',
+    'BODY_LEGS_CHONK': 'body_legs_chonk',
     'BODY_HANDS': 'body_hands',
     'BODY_FEET': 'body_feet',
     'BODY_BPF': 'body_bpf',
+    'BODY_GENITALS': 'body_genitals',
     'GEAR_CHEST': 'gear_chest',
     'GEAR_LEGS': 'gear_legs',
     'GEAR_HANDS': 'gear_hands',
     'GEAR_FEET': 'gear_feet',
     'PIERCINGS_CHEST': 'piercings_chest',
     'PIERCINGS_AMAB': 'piercings_amab',
+    'GENITALS_AMAB': 'genitals_amab',
+    'GENITALS_AFAB': 'genitals_afab',
+    'GENITALS_BPF': 'genitals_bpf',
 }
 
 # Shape key master names
@@ -59,12 +64,35 @@ GEAR_PROPERTIES = {
 
 # Bone layer groups for organized bone management
 BONE_LAYERS = {
-    'BASE': 'show_base_bones',
-    'SKIRT': 'show_skirt_bones',
-    'EXTRA': 'show_extra_bones',
-    'TAIL': 'show_tail_bones',
-    'IVCS': 'show_ivcs_bones',
-    'IVCS2': 'show_ivcs2_bones',
+    'BASE': ('show_base_bones', 0),
+    'SKIRT': ('show_skirt_bones', 1),
+    'EXTRA': ('show_extra_bones', 2),
+    'TAIL': ('show_tail_bones', 3),
+    'IVCS': ('show_ivcs_bones', 16),
+    'IVCS2': ('show_ivcs2_bones', 17),
+}
+
+# NSFW model groups for organized access
+NSFW_MODEL_GROUPS = [
+    MODEL_GROUPS['GENITALS_AMAB'],
+    MODEL_GROUPS['GENITALS_AFAB'], 
+    MODEL_GROUPS['GENITALS_BPF'],
+    MODEL_GROUPS['PIERCINGS_AMAB']
+]
+
+# Skeleton object constants
+SKELETON_OBJECTS = {
+    'OBJECT': 'Skeleton',
+    'ARMATURE': 'Skeleton'
+}
+
+# Special model indices for complex logic
+SPECIAL_INDICES = {
+    'CHONK_NSFW_INDEX': 3,  # Index for chonk NSFW model in body_legs_chonk
+    'AMAB_BUTT_INDEX': 0,   # Index for AMAB butt in body_genitals
+    'AFAB_BUTT_INDEX': 1,   # Index for AFAB butt in body_genitals
+    'BBWVR_INDEX': 0,       # Index for BBWVR AFAB model
+    'BIBO_INDEX': 1,        # Index for Bibo AFAB model
 }
 
 # Error messages for consistent logging

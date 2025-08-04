@@ -1,8 +1,11 @@
 # Toggle functions for TBSE Body Kit addon
 # These functions handle visibility toggles for various gear and piercing models
 import bpy
-from .constants import MODEL_GROUPS, SHAPE_SPECIFIC_MODELS
-from .utils import ModelCache, safe_hide_objects, get_models_by_groups, batch_toggle_visibility
+from .constants import MODEL_GROUPS, SHAPE_SPECIFIC_MODELS, SPECIAL_INDICES, SKELETON_OBJECTS
+from .utils import (
+    ModelCache, safe_hide_objects, get_models_by_groups, batch_toggle_visibility,
+    manage_skeleton_visibility, get_genital_model_by_type, show_single_model_by_index
+)
 from .json_helpers import getTextBlock, getModelsInList, setTextBlock, setModelName
 
 
@@ -101,29 +104,42 @@ def legToggle(self, context):
 def nsfwToggle(self, context):
     # Toggle visibility of NSFW models
     tbse_properties = context.scene.tbse_kit_properties
-    modelDict = getTextBlock()
-
-    # get object names of all nsfw models
-    genitals_amab = getModelsInList(modelDict, "genitals_amab")
-    genitals_afab = getModelsInList(modelDict, "genitals_afab")
-    genitals_bpf = getModelsInList(modelDict, "genitals_bpf")
-    piercings_amab = getModelsInList(modelDict, "piercings_amab")
-    body_legs_chonk = getModelsInList(modelDict, "body_legs_chonk")
-
-    # hides all nsfw models
-    bpy.data.objects[body_legs_chonk[3]].hide_set(True)
-    for obj in genitals_amab: bpy.data.objects[obj].hide_set(True)
-    for obj in genitals_afab: bpy.data.objects[obj].hide_set(True)
-    for obj in genitals_bpf: bpy.data.objects[obj].hide_set(True)
-    for obj in piercings_amab: bpy.data.objects[obj].hide_set(True)
-
-    # if NSFW TOGGLE enabled, show nsfw pieces -->
+    
+    # Get all NSFW-related model groups efficiently
+    nsfw_groups = [
+        MODEL_GROUPS['GENITALS_AMAB'],
+        MODEL_GROUPS['GENITALS_AFAB'],
+        MODEL_GROUPS['GENITALS_BPF'],
+        MODEL_GROUPS['PIERCINGS_AMAB'],
+        MODEL_GROUPS['BODY_LEGS_CHONK']
+    ]
+    
+    model_data = get_models_by_groups(nsfw_groups)
+    
+    # Hide all NSFW models initially
+    for group in nsfw_groups[:-1]:  # All except body_legs_chonk
+        if group in model_data:
+            safe_hide_objects(model_data[group], hide=True)
+    
+    # Special handling for chonk legs NSFW model (index 3)
+    chonk_legs = model_data.get(MODEL_GROUPS['BODY_LEGS_CHONK'], [])
+    if chonk_legs and len(chonk_legs) > SPECIAL_INDICES['CHONK_NSFW_INDEX']:
+        safe_hide_objects([chonk_legs[SPECIAL_INDICES['CHONK_NSFW_INDEX']]], hide=True)
+    
+    # Show appropriate NSFW models if enabled
     if tbse_properties['show_nsfw']:
-        if tbse_properties.leg_shape == 'chonk' and tbse_properties['show_legs']: # if LEG SHAPE is chonk, show chonk nsfw model
-            bpy.data.objects[body_legs_chonk[3]].hide_set(False)
-        else: # if LEG SHAPE is anything else, check nsfw logic
-            genitalSet(self, context) 
-        if tbse_properties['show_piercings_amab']: amabPiercingToggle(self, context)
+        if (tbse_properties.leg_shape == 'chonk' and 
+            tbse_properties['show_legs'] and
+            chonk_legs and len(chonk_legs) > SPECIAL_INDICES['CHONK_NSFW_INDEX']):
+            # Show chonk NSFW model
+            safe_hide_objects([chonk_legs[SPECIAL_INDICES['CHONK_NSFW_INDEX']]], hide=False)
+        else:
+            # Handle other NSFW logic
+            genitalSet(self, context)
+        
+        # Handle AMAB piercings if enabled
+        if tbse_properties['show_piercings_amab']:
+            amabPiercingToggle(self, context)
 
 
 def _simple_body_part_toggle(context, part_name: str, show_property: str):
@@ -151,38 +167,46 @@ def _simple_body_part_toggle(context, part_name: str, show_property: str):
 
 
 def handToggle(self, context):
-    """Toggle visibility of hand models."""
+    # Toggle visibility of hand models.
     _simple_body_part_toggle(context, 'hands', 'show_hands')
 
 
 def feetToggle(self, context):
-    """Toggle visibility of feet models.""" 
+    # Toggle visibility of feet models.
+    _simple_body_part_toggle(context, 'feet', 'show_feet')
     _simple_body_part_toggle(context, 'feet', 'show_feet')
 
 
 def bpfToggle(self, context):
-    """Toggle visibility of BPF models."""
+    # Toggle visibility of BPF models.
     _simple_body_part_toggle(context, 'bpf', 'show_bpf')
 
 
 def genitalToggle(self, context):
     # Toggle between AMAB and AFAB genital types
     tbse_properties = context.scene.tbse_kit_properties
-    modelDict = getTextBlock()
-
-    # get object names of butt models
-    body_genitals = getModelsInList(modelDict, "body_genitals")
-
-    # hides all butt models
-    for obj in body_genitals : bpy.data.objects[obj].hide_set(True)
-    # if LEG SHAPE is chonk, don't toggle enable any other leg model
-    if tbse_properties.leg_shape == 'chonk': return
-    # if LEG SHAPE is xl OR genital toggle is AMAB, show AMAB leg model
-    elif tbse_properties.genital_toggle == 'amab' or tbse_properties.leg_shape == 'xl':
-        bpy.data.objects[body_genitals[0]].hide_set(False)
-    # if toggle is AFAB, show AFAB leg model
-    else: bpy.data.objects[body_genitals[1]].hide_set(False)
-    # genital model logic
+    
+    # Get body genitals (butt models)
+    model_data = get_models_by_groups([MODEL_GROUPS['BODY_GENITALS']])
+    genitals = model_data.get(MODEL_GROUPS['BODY_GENITALS'], [])
+    
+    # Hide all butt models initially
+    safe_hide_objects(genitals, hide=True)
+    
+    # Don't show anything if leg shape is chonk
+    if tbse_properties.leg_shape == 'chonk':
+        return
+    
+    # Show appropriate genital model based on toggle and leg shape
+    if (tbse_properties.genital_toggle == 'amab' or 
+        tbse_properties.leg_shape == 'xl'):
+        # Show AMAB butt model
+        show_single_model_by_index(genitals, SPECIAL_INDICES['AMAB_BUTT_INDEX'])
+    else:
+        # Show AFAB butt model
+        show_single_model_by_index(genitals, SPECIAL_INDICES['AFAB_BUTT_INDEX'])
+    
+    # Handle specific genital model logic
     genitalSet(self, context)
 
 
@@ -209,61 +233,66 @@ def bpfToggle(self, context):
 def genitalSet(self, context):
     # Set specific genital model based on type selection
     tbse_properties = context.scene.tbse_kit_properties
-    modelDict = getTextBlock()
-
-    # get object names of all genital models
-    genitals_amab = getModelsInList(modelDict, "genitals_amab")
-    genitals_afab = getModelsInList(modelDict, "genitals_afab")
-    genitals_bpf = getModelsInList(modelDict, "genitals_bpf")
-
-    # hide all genital models
-    for obj in genitals_amab: bpy.data.objects[obj].hide_set(True)
-    for obj in genitals_afab: bpy.data.objects[obj].hide_set(True)
-    for obj in genitals_bpf: bpy.data.objects[obj].hide_set(True)
-
-    # if NSFW is enabled, show models -->
-    if tbse_properties['show_nsfw'] and tbse_properties['show_legs']:
-        # if AMAB enabled, OR if LEG SHAPE is xl or chonk, allow AMAB models to show
-        if tbse_properties.genital_toggle == 'amab' or tbse_properties.leg_shape == 'xl' or tbse_properties.leg_shape == 'chonk':
-            # find specific AMAB type through enum value
-            # model name list includes same set of types
-            amab_type = tbse_properties.bl_rna.properties.get('amab_type')
-            obj = genitals_amab[amab_type.enum_items.find(tbse_properties.amab_type)]
-        else:  # if AFAB enabled, allow AFAB models to show
-            if tbse_properties.afab_type == 'bbwvr': obj = genitals_afab[0] # show seperate bbwvr model
-            else: obj = genitals_afab[1] # if not bbwvr, show bibo genital model
-            if tbse_properties['show_bpf'] : bpfToggle(self, context) # if BPF enabled, toggle bpf model
-            # change bibo shape
-            from .drivers import afab_driver
-            afab_driver(self, context)
+    
+    # Get all genital model groups
+    genital_groups = [
+        MODEL_GROUPS['GENITALS_AMAB'],
+        MODEL_GROUPS['GENITALS_AFAB'],
+        MODEL_GROUPS['GENITALS_BPF']
+    ]
+    
+    model_data = get_models_by_groups(genital_groups)
+    
+    # Hide all genital models initially
+    for group in genital_groups:
+        if group in model_data:
+            safe_hide_objects(model_data[group], hide=True)
+    
+    # Show models only if NSFW and legs are enabled
+    if not (tbse_properties['show_nsfw'] and tbse_properties['show_legs']):
+        return
+    
+    # Handle AMAB models
+    if (tbse_properties.genital_toggle == 'amab' or 
+        tbse_properties.leg_shape in ['xl', 'chonk']):
+        
+        amab_models = model_data.get(MODEL_GROUPS['GENITALS_AMAB'], [])
+        if amab_models:
+            # Get specific AMAB model by type
+            amab_type_prop = tbse_properties.bl_rna.properties.get('amab_type')
+            selected_model = get_genital_model_by_type(
+                amab_models, 
+                tbse_properties.amab_type, 
+                amab_type_prop
+            )
+            if selected_model:
+                safe_hide_objects([selected_model], hide=False)
+    
+    # Handle AFAB models  
+    else:
+        afab_models = model_data.get(MODEL_GROUPS['GENITALS_AFAB'], [])
+        if afab_models:
+            # Special handling for BBWVR vs Bibo models
+            if tbse_properties.afab_type == 'bbwvr':
+                show_single_model_by_index(afab_models, SPECIAL_INDICES['BBWVR_INDEX'])
+            else:
+                show_single_model_by_index(afab_models, SPECIAL_INDICES['BIBO_INDEX'])
+                
+                # Handle BPF if enabled
+                if tbse_properties['show_bpf']:
+                    bpfToggle(self, context)
+                
+                # Change bibo shape
+                from .drivers import afab_driver
+                afab_driver(self, context)
 
 
 def boneToggles(self, context):
     # Toggle visibility of different bone layers
     tbse_properties = context.scene.tbse_kit_properties
-    obj = bpy.data.objects["Skeleton"]
-    skele = bpy.data.armatures["Skeleton"]
-
-    if tbse_properties['show_armature']: obj.hide_set(False)
-    else: obj.hide_set(True)
-
-    if tbse_properties['show_base_bones']: skele.layers[0] = True
-    else: skele.layers[0] = False
-
-    if tbse_properties['show_skirt_bones']: skele.layers[1] = True
-    else: skele.layers[1] = False
-
-    if tbse_properties['show_extra_bones']: skele.layers[2] = True
-    else: skele.layers[2] = False
-
-    if tbse_properties.get('show_tail_bones'): skele.layers[3] = True
-    else: skele.layers[3] = False
-
-    if tbse_properties.get('show_ivcs_bones'): skele.layers[16] = True
-    else: skele.layers[16] = False
-
-    if tbse_properties.get('show_ivcs2_bones'): skele.layers[17] = True
-    else: skele.layers[17] = False
+    
+    # Use the utility function for skeleton management
+    manage_skeleton_visibility(tbse_properties, SKELETON_OBJECTS['OBJECT'])
 
 
 def chestPiercingToggle(self, context):
