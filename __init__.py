@@ -19,6 +19,7 @@ from . import drivers
 from . import constants
 from . import utils
 from . import setup_helpers
+from . import gear_helpers
 
 def register():
     # Register in dependency order: properties first, then UI components

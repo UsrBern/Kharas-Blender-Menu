@@ -60,13 +60,7 @@ class TBSEKIT_OT_setupModels(Operator):
             self.report({'ERROR'}, f"Setup error: {str(e)}")
             
         return {'FINISHED'}
-        props.genital_toggle = 'amab'
-        props.amab_type = 'a'
-        props.afab_type = 'a'
-        props.show_piercings_chest = False
-        props.show_piercings_amab = False
-        self.report({'INFO'}, "TBSE Body Kit: Reset to default.")
-        return {'FINISHED'}
+
 
 class TBSEKIT_OT_rename(Operator):
     bl_idname = "object.renaming"
@@ -251,8 +245,30 @@ class TBSEKIT_OT_chestGearAdd(Operator):
 
     def execute(self, context):
         # Add selected gear model to chest gear list
-        # addGearList(obj, gearlist, master)
-        self.report({'INFO'}, "TBSE Body Kit: Chest gear added.")
+        from .gear_helpers import add_gear_to_list, add_gear_to_json
+        from .constants import SHAPE_KEY_MASTERS
+        
+        selected_objects = context.selected_objects
+        if not selected_objects:
+            self.report({'WARNING'}, "No objects selected")
+            return {'CANCELLED'}
+        
+        chest_list = context.scene.chest_gear_list
+        success_count = 0
+        
+        for obj in selected_objects:
+            if obj.type == 'MESH':
+                if add_gear_to_list(obj, chest_list, SHAPE_KEY_MASTERS['CHEST']):
+                    add_gear_to_json(obj, "chest_gear_", "gear_chest")
+                    success_count += 1
+                else:
+                    self.report({'WARNING'}, f"Failed to add shape keys to {obj.name}")
+        
+        if success_count > 0:
+            self.report({'INFO'}, f"TBSE Body Kit: Added {success_count} chest gear item(s).")
+        else:
+            self.report({'WARNING'}, "No valid mesh objects were added")
+            
         return {'FINISHED'}
 
 
@@ -268,7 +284,30 @@ class TBSEKIT_OT_chestGearRemove(Operator):
 
     def execute(self, context):
         # Remove gear model from chest gear list
-        # removeGearJson(obj, modelDict, modelGroupKey)
+        from .gear_helpers import remove_shape_keys, remove_gear_from_json, remove_gear_from_list
+        
+        chest_list = context.scene.chest_gear_list
+        index = context.scene.chest_gear_index
+        
+        if not chest_list or index < 0 or index >= len(chest_list):
+            self.report({'WARNING'}, "No valid gear item selected")
+            return {'CANCELLED'}
+        
+        gear_item = chest_list[index]
+        obj = gear_item.obj_pointer
+        
+        # Remove shape keys from object
+        if obj:
+            remove_shape_keys(obj)
+            remove_gear_from_json(obj, "gear_chest")
+        
+        # Remove from list
+        remove_gear_from_list(chest_list, index)
+        
+        # Adjust index if needed
+        if index >= len(chest_list) and len(chest_list) > 0:
+            context.scene.chest_gear_index = len(chest_list) - 1
+        
         self.report({'INFO'}, "TBSE Body Kit: Chest gear removed.")
         return {'FINISHED'}
 
@@ -284,8 +323,30 @@ class TBSEKIT_OT_legGearAdd(Operator):
 
     def execute(self, context):
         # Add selected gear model to leg gear list
-        # addGearList(obj, gearlist, master)
-        self.report({'INFO'}, "TBSE Body Kit: Leg gear added.")
+        from .gear_helpers import add_gear_to_list, add_gear_to_json
+        from .constants import SHAPE_KEY_MASTERS
+        
+        selected_objects = context.selected_objects
+        if not selected_objects:
+            self.report({'WARNING'}, "No objects selected")
+            return {'CANCELLED'}
+        
+        leg_list = context.scene.leg_gear_list
+        success_count = 0
+        
+        for obj in selected_objects:
+            if obj.type == 'MESH':
+                if add_gear_to_list(obj, leg_list, SHAPE_KEY_MASTERS['LEG']):
+                    add_gear_to_json(obj, "leg_gear_", "gear_legs")
+                    success_count += 1
+                else:
+                    self.report({'WARNING'}, f"Failed to add shape keys to {obj.name}")
+        
+        if success_count > 0:
+            self.report({'INFO'}, f"TBSE Body Kit: Added {success_count} leg gear item(s).")
+        else:
+            self.report({'WARNING'}, "No valid mesh objects were added")
+            
         return {'FINISHED'}
 
 class TBSEKIT_OT_legGearRemove(Operator):
@@ -300,7 +361,30 @@ class TBSEKIT_OT_legGearRemove(Operator):
 
     def execute(self, context):
         # Remove gear model from leg gear list
-        # removeGearJson(obj, modelDict, modelGroupKey)
+        from .gear_helpers import remove_shape_keys, remove_gear_from_json, remove_gear_from_list
+        
+        leg_list = context.scene.leg_gear_list
+        index = context.scene.leg_gear_index
+        
+        if not leg_list or index < 0 or index >= len(leg_list):
+            self.report({'WARNING'}, "No valid gear item selected")
+            return {'CANCELLED'}
+        
+        gear_item = leg_list[index]
+        obj = gear_item.obj_pointer
+        
+        # Remove shape keys from object
+        if obj:
+            remove_shape_keys(obj)
+            remove_gear_from_json(obj, "gear_legs")
+        
+        # Remove from list
+        remove_gear_from_list(leg_list, index)
+        
+        # Adjust index if needed
+        if index >= len(leg_list) and len(leg_list) > 0:
+            context.scene.leg_gear_index = len(leg_list) - 1
+        
         self.report({'INFO'}, "TBSE Body Kit: Leg gear removed.")
         return {'FINISHED'}
 
@@ -316,8 +400,31 @@ class TBSEKIT_OT_handGearAdd(Operator):
 
     def execute(self, context):
         # Add selected gear model to hand gear list
-        # addGearList(obj, gearlist, master)
-        self.report({'INFO'}, "TBSE Body Kit: Hand gear added.")
+        from .gear_helpers import add_gear_to_list, add_gear_to_json
+        from .constants import SHAPE_KEY_MASTERS
+        
+        selected_objects = context.selected_objects
+        if not selected_objects:
+            self.report({'WARNING'}, "No objects selected")
+            return {'CANCELLED'}
+        
+        hand_list = context.scene.hand_gear_list
+        success_count = 0
+        
+        for obj in selected_objects:
+            if obj.type == 'MESH':
+                # Hand gear uses chest master for shape keys
+                if add_gear_to_list(obj, hand_list, SHAPE_KEY_MASTERS['CHEST']):
+                    add_gear_to_json(obj, "hand_gear_", "gear_hands")
+                    success_count += 1
+                else:
+                    self.report({'WARNING'}, f"Failed to add shape keys to {obj.name}")
+        
+        if success_count > 0:
+            self.report({'INFO'}, f"TBSE Body Kit: Added {success_count} hand gear item(s).")
+        else:
+            self.report({'WARNING'}, "No valid mesh objects were added")
+            
         return {'FINISHED'}
 
 class TBSEKIT_OT_handGearRemove(Operator):
@@ -332,7 +439,30 @@ class TBSEKIT_OT_handGearRemove(Operator):
 
     def execute(self, context):
         # Remove gear model from hand gear list
-        # removeGearJson(obj, modelDict, modelGroupKey)
+        from .gear_helpers import remove_shape_keys, remove_gear_from_json, remove_gear_from_list
+        
+        hand_list = context.scene.hand_gear_list
+        index = context.scene.hand_gear_index
+        
+        if not hand_list or index < 0 or index >= len(hand_list):
+            self.report({'WARNING'}, "No valid gear item selected")
+            return {'CANCELLED'}
+        
+        gear_item = hand_list[index]
+        obj = gear_item.obj_pointer
+        
+        # Remove shape keys from object
+        if obj:
+            remove_shape_keys(obj)
+            remove_gear_from_json(obj, "gear_hands")
+        
+        # Remove from list
+        remove_gear_from_list(hand_list, index)
+        
+        # Adjust index if needed
+        if index >= len(hand_list) and len(hand_list) > 0:
+            context.scene.hand_gear_index = len(hand_list) - 1
+        
         self.report({'INFO'}, "TBSE Body Kit: Hand gear removed.")
         return {'FINISHED'}
 
@@ -348,8 +478,31 @@ class TBSEKIT_OT_feetGearAdd(Operator):
 
     def execute(self, context):
         # Add selected gear model to feet gear list
-        # addGearList(obj, gearlist, master)
-        self.report({'INFO'}, "TBSE Body Kit: Feet gear added.")
+        from .gear_helpers import add_gear_to_list, add_gear_to_json
+        from .constants import SHAPE_KEY_MASTERS
+        
+        selected_objects = context.selected_objects
+        if not selected_objects:
+            self.report({'WARNING'}, "No objects selected")
+            return {'CANCELLED'}
+        
+        feet_list = context.scene.feet_gear_list
+        success_count = 0
+        
+        for obj in selected_objects:
+            if obj.type == 'MESH':
+                # Feet gear uses leg master for shape keys
+                if add_gear_to_list(obj, feet_list, SHAPE_KEY_MASTERS['LEG']):
+                    add_gear_to_json(obj, "feet_gear_", "gear_feet")
+                    success_count += 1
+                else:
+                    self.report({'WARNING'}, f"Failed to add shape keys to {obj.name}")
+        
+        if success_count > 0:
+            self.report({'INFO'}, f"TBSE Body Kit: Added {success_count} feet gear item(s).")
+        else:
+            self.report({'WARNING'}, "No valid mesh objects were added")
+            
         return {'FINISHED'}
 
 class TBSEKIT_OT_feetGearRemove(Operator):
@@ -364,7 +517,30 @@ class TBSEKIT_OT_feetGearRemove(Operator):
 
     def execute(self, context):
         # Remove gear model from feet gear list
-        # removeGearJson(obj, modelDict, modelGroupKey)
+        from .gear_helpers import remove_shape_keys, remove_gear_from_json, remove_gear_from_list
+        
+        feet_list = context.scene.feet_gear_list
+        index = context.scene.feet_gear_index
+        
+        if not feet_list or index < 0 or index >= len(feet_list):
+            self.report({'WARNING'}, "No valid gear item selected")
+            return {'CANCELLED'}
+        
+        gear_item = feet_list[index]
+        obj = gear_item.obj_pointer
+        
+        # Remove shape keys from object
+        if obj:
+            remove_shape_keys(obj)
+            remove_gear_from_json(obj, "gear_feet")
+        
+        # Remove from list
+        remove_gear_from_list(feet_list, index)
+        
+        # Adjust index if needed
+        if index >= len(feet_list) and len(feet_list) > 0:
+            context.scene.feet_gear_index = len(feet_list) - 1
+        
         self.report({'INFO'}, "TBSE Body Kit: Feet gear removed.")
         return {'FINISHED'}
 

@@ -19,6 +19,7 @@ from .toggles import (
     gearToggle, modelNameChange
 )
 from .drivers import chest_driver, leg_driver
+from .gear_helpers import select_chest_gear, select_leg_gear, select_hand_gear, select_feet_gear
 
 
 class TBSEKIT_TBSEProperties(PropertyGroup):
@@ -211,8 +212,49 @@ class TBSEKIT_BulkExport(PropertyGroup):
 # Registration
 def register():
     bpy.utils.register_class(TBSEKIT_TBSEProperties)
+    bpy.utils.register_class(TBSEKIT_chestPiercingToggles)
+    bpy.utils.register_class(TBSEKIT_AMABPiercingToggles)
+    bpy.utils.register_class(ChestListItem)
+    bpy.utils.register_class(LegListItem)
+    bpy.utils.register_class(HandListItem)
+    bpy.utils.register_class(FeetListItem)
+    bpy.utils.register_class(TBSEKIT_BulkExport)
+    
     bpy.types.Scene.tbse_kit_properties = PointerProperty(type=TBSEKIT_TBSEProperties)
+    bpy.types.Scene.tbse_chest_toggles = PointerProperty(type=TBSEKIT_chestPiercingToggles)
+    bpy.types.Scene.tbse_amab_toggles = PointerProperty(type=TBSEKIT_AMABPiercingToggles)
+    
+    # Gear lists
+    bpy.types.Scene.chest_gear_list = CollectionProperty(type=ChestListItem)
+    bpy.types.Scene.chest_gear_index = IntProperty(default=0, update=select_chest_gear)
+    bpy.types.Scene.leg_gear_list = CollectionProperty(type=LegListItem)
+    bpy.types.Scene.leg_gear_index = IntProperty(default=0, update=select_leg_gear)
+    bpy.types.Scene.hand_gear_list = CollectionProperty(type=HandListItem)
+    bpy.types.Scene.hand_gear_index = IntProperty(default=0, update=select_hand_gear)
+    bpy.types.Scene.feet_gear_list = CollectionProperty(type=FeetListItem)
+    bpy.types.Scene.feet_gear_index = IntProperty(default=0, update=select_feet_gear)
+    
+    bpy.types.Scene.tbse_bulk_export = PointerProperty(type=TBSEKIT_BulkExport)
 
 def unregister():
+    del bpy.types.Scene.tbse_bulk_export
+    del bpy.types.Scene.feet_gear_index
+    del bpy.types.Scene.feet_gear_list
+    del bpy.types.Scene.hand_gear_index
+    del bpy.types.Scene.hand_gear_list
+    del bpy.types.Scene.leg_gear_index
+    del bpy.types.Scene.leg_gear_list
+    del bpy.types.Scene.chest_gear_index
+    del bpy.types.Scene.chest_gear_list
+    del bpy.types.Scene.tbse_amab_toggles
+    del bpy.types.Scene.tbse_chest_toggles
     del bpy.types.Scene.tbse_kit_properties
+    
+    bpy.utils.unregister_class(TBSEKIT_BulkExport)
+    bpy.utils.unregister_class(FeetListItem)
+    bpy.utils.unregister_class(HandListItem)
+    bpy.utils.unregister_class(LegListItem)
+    bpy.utils.unregister_class(ChestListItem)
+    bpy.utils.unregister_class(TBSEKIT_AMABPiercingToggles)
+    bpy.utils.unregister_class(TBSEKIT_chestPiercingToggles)
     bpy.utils.unregister_class(TBSEKIT_TBSEProperties)
