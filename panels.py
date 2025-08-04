@@ -17,6 +17,14 @@ class TBSEKIT_PT_mainPanel(TBSEKIT_View3DPanel, Panel):
     def draw(self, context):
         layout = self.layout
         layout.label(text="TBSE Body Kit Controls")
+        
+        # Add setup button for first-time users
+        row = layout.row()
+        row.operator("object.setup_models", text="Setup Models Data", icon='FILE_REFRESH')
+        
+        # Add reset to default button
+        row = layout.row()
+        row.operator("object.set_to_default", text="Reset to Default", icon='RECOVER_LAST')
 
 class TBSEKIT_PT_modelPanel(TBSEKIT_View3DPanel, Panel):
     # Panel for body part model toggles.

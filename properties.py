@@ -206,3 +206,13 @@ class TBSEKIT_BulkExport(PropertyGroup):
     with_nsfw:              BoolProperty(default=False)
     with_chest_piercings:   BoolProperty(default=False)
     with_amab_piercings:    BoolProperty(default=False)
+
+
+# Registration
+def register():
+    bpy.utils.register_class(TBSEKIT_TBSEProperties)
+    bpy.types.Scene.tbse_kit_properties = PointerProperty(type=TBSEKIT_TBSEProperties)
+
+def unregister():
+    del bpy.types.Scene.tbse_kit_properties
+    bpy.utils.unregister_class(TBSEKIT_TBSEProperties)

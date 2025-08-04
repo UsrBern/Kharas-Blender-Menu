@@ -21,13 +21,45 @@ class TBSEKIT_OT_setToDefault(Operator):
     def execute(self, context):
         # Reset all toggles and shape keys to default values
         props = context.scene.tbse_kit_properties
-        props.show_chest = True
-        props.show_legs = True
-        props.show_hands = True
-        props.show_feet = True
-        props.show_nsfw = False
-        props.chest_shape = 'tbse'
-        props.leg_shape = 'tbse'
+        
+        # Reset all properties to their defaults
+        for prop_name, prop in props.bl_rna.properties.items():
+            if hasattr(prop, 'default') and prop_name != 'name':
+                setattr(props, prop_name, prop.default)
+        
+        self.report({'INFO'}, "TBSE Body Kit: Reset to default settings.")
+        return {'FINISHED'}
+
+
+class TBSEKIT_OT_setupModels(Operator):
+    # Install the models data into Blender's .models text block
+    bl_idname = "object.setup_models"
+    bl_label = "Setup TBSE Models Data"
+    bl_description = "Install the required models data for the addon to function"
+    bl_options = {"REGISTER","UNDO"}
+
+    @classmethod
+    def poll(cls, context):
+        return True
+
+    def execute(self, context):
+        try:
+            from .setup_helpers import install_models_data, verify_models_data
+            
+            # Install the models data
+            if install_models_data():
+                # Verify it was installed correctly
+                if verify_models_data():
+                    self.report({'INFO'}, "TBSE models data installed successfully!")
+                else:
+                    self.report({'WARNING'}, "Models data installed but verification failed")
+            else:
+                self.report({'ERROR'}, "Failed to install models data")
+                
+        except Exception as e:
+            self.report({'ERROR'}, f"Setup error: {str(e)}")
+            
+        return {'FINISHED'}
         props.genital_toggle = 'amab'
         props.amab_type = 'a'
         props.afab_type = 'a'
@@ -335,3 +367,29 @@ class TBSEKIT_OT_feetGearRemove(Operator):
         # removeGearJson(obj, modelDict, modelGroupKey)
         self.report({'INFO'}, "TBSE Body Kit: Feet gear removed.")
         return {'FINISHED'}
+
+
+# Registration
+classes = (
+    TBSEKIT_OT_setToDefault,
+    TBSEKIT_OT_setupModels,
+    TBSEKIT_OT_rename,
+    TBSEKIT_OT_importFBX,
+    TBSEKIT_OT_exportFBX,
+    TBSEKIT_OT_chestGearAdd,
+    TBSEKIT_OT_chestGearRemove,
+    TBSEKIT_OT_legGearAdd,
+    TBSEKIT_OT_legGearRemove,
+    TBSEKIT_OT_handGearAdd,
+    TBSEKIT_OT_handGearRemove,
+    TBSEKIT_OT_feetGearAdd,
+    TBSEKIT_OT_feetGearRemove,
+)
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+
+def unregister():
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
