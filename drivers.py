@@ -2,6 +2,17 @@
 import bpy
 from .json_helpers import getTextBlock, getModelsInList
 
+def chest_resetDrivers():
+    # Reset all chest shape keys back to TBSE (Basis).
+    try:
+        for key in bpy.data.shape_keys["Chest Master"].key_blocks:
+            key.value = 0
+    except KeyError:
+        # Handle case where "Chest Master" shape keys don't exist
+        print("Warning: Chest Master shape keys not found. Skipping chest shape reset.")
+        return False
+    return True
+
 def chest_driver(self, context):
     # Driver logic for chest shape keys.
     tbse_properties = context.scene.tbse_kit_properties
