@@ -4,8 +4,9 @@ from bpy.types import Operator
 from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty, PointerProperty, CollectionProperty
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 
+
 class TBSEKIT_OT_setToDefault(Operator):
-    "Resets all shapekeys and toggles back to default."
+    # Resets all shapekeys and toggles back to default
     bl_idname = "object.set_to_default"
     bl_label = "Set to Default"
     bl_options = {"REGISTER","UNDO"}

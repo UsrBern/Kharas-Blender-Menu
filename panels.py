@@ -1,14 +1,15 @@
+
 import bpy
 from bpy.types import Panel, Menu
 
 class TBSEKIT_View3DPanel:
-    # Parent class for all TBSE Body Kit panels
+    # Parent class for all TBSE Body Kit panels.
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = 'Body Kit'
 
 class TBSEKIT_PT_mainPanel(TBSEKIT_View3DPanel, Panel):
-    # Main panel for TBSE Body Kit addon
+    # Main panel for TBSE Body Kit addon.
     bl_idname = "TBSEKIT_PT_mainPanel"
     bl_label = "TBSE Body Kit"
 
@@ -17,7 +18,7 @@ class TBSEKIT_PT_mainPanel(TBSEKIT_View3DPanel, Panel):
         layout.label(text="TBSE Body Kit Controls")
 
 class TBSEKIT_PT_modelPanel(TBSEKIT_View3DPanel, Panel):
-    # Panel for body part model toggles
+    # Panel for body part model toggles.
     bl_idname = "TBSEKIT_PT_modelPanel"
     bl_label = "Body Part Toggles"
 
@@ -26,7 +27,7 @@ class TBSEKIT_PT_modelPanel(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Body Part Toggles")
 
 class TBSEKIT_PT_chestPanel(TBSEKIT_View3DPanel, Panel):
-    # Panel for chest shape options
+    # Panel for chest shape options.
     bl_idname = "TBSEKIT_PT_chestPanel"
     bl_label = "Chest Shape"
 
@@ -35,7 +36,7 @@ class TBSEKIT_PT_chestPanel(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Chest Shape Options")
 
 class TBSEKIT_PT_legPanel(TBSEKIT_View3DPanel, Panel):
-    # Panel for leg shape options
+    # Panel for leg shape options.
     bl_idname = "TBSEKIT_PT_legPanel"
     bl_label = "Leg Shape"
 
@@ -44,7 +45,7 @@ class TBSEKIT_PT_legPanel(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Leg Shape Options")
 
 class TBSEKIT_PT_nsfwPanel(TBSEKIT_View3DPanel, Panel):
-    # Panel for NSFW options
+    # Panel for NSFW options.
     bl_idname = "TBSEKIT_PT_nsfwPanel"
     bl_label = "NSFW Options"
 
@@ -53,7 +54,7 @@ class TBSEKIT_PT_nsfwPanel(TBSEKIT_View3DPanel, Panel):
         layout.label(text="NSFW Options")
 
 class TBSEKIT_PT_piercingPanel(TBSEKIT_View3DPanel, Panel):
-    # Panel for piercing model toggles
+    # Panel for piercing model toggles.
     bl_idname = "TBSEKIT_PT_piercingPanel"
     bl_label = "Piercing Models"
 
@@ -62,7 +63,7 @@ class TBSEKIT_PT_piercingPanel(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Piercing Model Options")
 
 class TBSEKIT_PT_advancedPanel(TBSEKIT_View3DPanel, Panel):
-    # Panel for advanced features (bone groups, etc)
+    # Panel for advanced features (bone groups, etc).
     bl_idname = "TBSEKIT_PT_advancedPanel"
     bl_label = "Advanced Features"
 
@@ -71,7 +72,7 @@ class TBSEKIT_PT_advancedPanel(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Advanced Features")
 
 class TBSEKIT_PT_renamePanel(TBSEKIT_View3DPanel, Panel):
-    # Panel for bulk renaming models
+    # Panel for bulk renaming models.
     bl_idname = "TBSEKIT_PT_renamePanel"
     bl_label = "Bulk Rename"
 
@@ -80,7 +81,7 @@ class TBSEKIT_PT_renamePanel(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Bulk Rename Models")
 
 class TBSEKIT_PT_gearToggle(TBSEKIT_View3DPanel, Panel):
-    # Panel for gear model toggles
+    # Panel for gear model toggles.
     bl_idname = "TBSEKIT_PT_gearToggle"
     bl_label = "Gear Model Toggles"
 
@@ -89,7 +90,7 @@ class TBSEKIT_PT_gearToggle(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Gear Model Toggles")
 
 class TBSEKIT_PT_chestGearList(TBSEKIT_View3DPanel, Panel):
-    # Panel for chest gear list
+    # Panel for chest gear list.
     bl_idname = "TBSEKIT_PT_chestGearList"
     bl_label = "Chest Gear List"
 
@@ -98,7 +99,7 @@ class TBSEKIT_PT_chestGearList(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Chest Gear List")
 
 class TBSEKIT_PT_legGearList(TBSEKIT_View3DPanel, Panel):
-    # Panel for leg gear list
+    # Panel for leg gear list.
     bl_idname = "TBSEKIT_PT_legGearList"
     bl_label = "Leg Gear List"
 
@@ -107,7 +108,7 @@ class TBSEKIT_PT_legGearList(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Leg Gear List")
 
 class TBSEKIT_PT_handGearList(TBSEKIT_View3DPanel, Panel):
-    # Panel for hand gear list
+    # Panel for hand gear list.
     bl_idname = "TBSEKIT_PT_handGearList"
     bl_label = "Hand Gear List"
 
@@ -116,7 +117,7 @@ class TBSEKIT_PT_handGearList(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Hand Gear List")
 
 class TBSEKIT_PT_feetGearList(TBSEKIT_View3DPanel, Panel):
-    # Panel for feet gear list
+    # Panel for feet gear list.
     bl_idname = "TBSEKIT_PT_feetGearList"
     bl_label = "Feet Gear List"
 
@@ -125,7 +126,7 @@ class TBSEKIT_PT_feetGearList(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Feet Gear List")
 
 class TBSEKIT_PT_boneGroups(TBSEKIT_View3DPanel, Panel):
-    # Panel for bone group toggles
+    """Panel for bone group toggles."""
     bl_idname = "TBSEKIT_PT_boneGroups"
     bl_label = "Bone Groups"
 
@@ -134,7 +135,7 @@ class TBSEKIT_PT_boneGroups(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Bone Groups")
 
 class TBSEKIT_PT_testingPanel(TBSEKIT_View3DPanel, Panel):
-    # Panel for testing purposes
+    # Panel for testing purposes.
     bl_idname = "TBSEKIT_PT_testingPanel"
     bl_label = "Testing Panel"
 
@@ -143,7 +144,7 @@ class TBSEKIT_PT_testingPanel(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Testing Panel")
 
 class TBSEKIT_MT_chestPiercingsMenu(TBSEKIT_View3DPanel, Menu):
-    # Menu for chest piercings
+    # Menu for chest piercings.
     bl_idname = "TBSEKIT_MT_chestPiercingsMenu"
     bl_label = "Chest Piercings Menu"
 
@@ -152,7 +153,7 @@ class TBSEKIT_MT_chestPiercingsMenu(TBSEKIT_View3DPanel, Menu):
         layout.label(text="Chest Piercings Menu")
 
 class TBSEKIT_MT_amabPiercingsMenu(TBSEKIT_View3DPanel, Menu):
-    # Menu for AMAB piercings
+    # Menu for AMAB piercings.
     bl_idname = "TBSEKIT_MT_amabPiercingsMenu"
     bl_label = "AMAB Piercings Menu"
 

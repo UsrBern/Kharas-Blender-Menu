@@ -4,7 +4,6 @@ from bpy.types import UIList
 class TBSEKIT_UL_chestGear(UIList):
     # UIList for chest gear items.
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        
         if self.layout_type in {'DEFAULT','COMPACT'}:
             row = layout.row()
             row.prop(item, "model_name", text="", emboss=False)
@@ -19,7 +18,6 @@ class TBSEKIT_UL_chestGear(UIList):
 class TBSEKIT_UL_legGear(UIList):
     # UIList for leg gear items.
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        
         if self.layout_type in {'DEFAULT','COMPACT'}:
             row = layout.row()
             row.prop(item, "model_name", text="", emboss=False)
@@ -34,7 +32,6 @@ class TBSEKIT_UL_legGear(UIList):
 class TBSEKIT_UL_handGear(UIList):
     # UIList for hand gear items.
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        
         if self.layout_type in {'DEFAULT','COMPACT'}:
             row = layout.row()
             row.prop(item, "model_name", text="", emboss=False)
