@@ -496,18 +496,20 @@ class TBSEKIT_OT_exportFBX(Operator, ExportHelper):
         self.report({'INFO'}, "TBSE Body Kit: FBX export complete.")
         return {'FINISHED'}
 
-class TBSEKIT_OT_chestGearAdd(Operator):
-    bl_idname = "object.chest_gear_add"
-    bl_label = "Add selected gear model to chest gear list."
-    bl_description = "This adds chest shape keys to the object"
+class TBSEKIT_OT_gearAdd(Operator):
+    bl_idname = "object.gear_add"
+    bl_label = "Add selected gear model to gear list"
+    bl_description = "This adds shape keys to the selected objects"
     bl_options = {'REGISTER','UNDO'}
+    
+    gear_type: StringProperty()
 
     @classmethod
     def poll(cls, context):
         return True
 
     def execute(self, context):
-        # Add selected gear model to chest gear list
+        # Generic gear add operator
         from .constants import SHAPE_KEY_MASTERS
         
         selected_objects = context.selected_objects
@@ -515,62 +517,148 @@ class TBSEKIT_OT_chestGearAdd(Operator):
             self.report({'WARNING'}, "No objects selected")
             return {'CANCELLED'}
         
-        chest_list = context.scene.chest_gear_list
+        # Get gear list and master based on type
+        gear_config = {
+            'chest': {
+                'list': context.scene.chest_gear_list,
+                'master': SHAPE_KEY_MASTERS['CHEST'],
+                'prefix': "chest_gear_",
+                'json_key': "gear_chest"
+            },
+            'leg': {
+                'list': context.scene.leg_gear_list,
+                'master': SHAPE_KEY_MASTERS['LEG'],
+                'prefix': "leg_gear_",
+                'json_key': "gear_legs"
+            },
+            'hand': {
+                'list': context.scene.hand_gear_list,
+                'master': SHAPE_KEY_MASTERS['CHEST'],  # Hand gear uses chest master
+                'prefix': "hand_gear_",
+                'json_key': "gear_hands"
+            },
+            'feet': {
+                'list': context.scene.feet_gear_list,
+                'master': SHAPE_KEY_MASTERS['LEG'],  # Feet gear uses leg master
+                'prefix': "feet_gear_",
+                'json_key': "gear_feet"
+            }
+        }
+        
+        if self.gear_type not in gear_config:
+            self.report({'ERROR'}, f"Unknown gear type: {self.gear_type}")
+            return {'CANCELLED'}
+        
+        config = gear_config[self.gear_type]
+        gear_list = config['list']
         success_count = 0
         
         for obj in selected_objects:
             if obj.type == 'MESH':
-                if add_gear_to_list(obj, chest_list, SHAPE_KEY_MASTERS['CHEST']):
-                    add_gear_to_json(obj, "chest_gear_", "gear_chest")
+                if add_gear_to_list(obj, gear_list, config['master']):
+                    add_gear_to_json(obj, config['prefix'], config['json_key'])
                     success_count += 1
                 else:
                     self.report({'WARNING'}, f"Failed to add shape keys to {obj.name}")
         
         if success_count > 0:
-            self.report({'INFO'}, f"TBSE Body Kit: Added {success_count} chest gear item(s).")
+            self.report({'INFO'}, f"TBSE Body Kit: Added {success_count} {self.gear_type} gear item(s).")
         else:
             self.report({'WARNING'}, "No valid mesh objects were added")
             
         return {'FINISHED'}
 
 
-class TBSEKIT_OT_chestGearRemove(Operator):
-    bl_idname = "object.chest_gear_remove"
-    bl_label = "Remove gear model from chest gear list."
+class TBSEKIT_OT_gearRemove(Operator):
+    bl_idname = "object.gear_remove"
+    bl_label = "Remove gear model from gear list"
     bl_description = "THIS WILL REMOVE ALL SHAPEKEYS!"
     bl_options = {'REGISTER','UNDO'}
+    
+    gear_type: StringProperty()
 
     @classmethod
     def poll(cls, context):
         return True
 
     def execute(self, context):
-        # Remove gear model from chest gear list
+        # Generic gear remove operator
         
-        chest_list = context.scene.chest_gear_list
-        index = context.scene.chest_gear_index
+        # Get gear list and index based on type
+        gear_config = {
+            'chest': {
+                'list': context.scene.chest_gear_list,
+                'index_prop': 'chest_gear_index',
+                'json_key': "gear_chest"
+            },
+            'leg': {
+                'list': context.scene.leg_gear_list,
+                'index_prop': 'leg_gear_index',
+                'json_key': "gear_legs"
+            },
+            'hand': {
+                'list': context.scene.hand_gear_list,
+                'index_prop': 'hand_gear_index',
+                'json_key': "gear_hands"
+            },
+            'feet': {
+                'list': context.scene.feet_gear_list,
+                'index_prop': 'feet_gear_index',
+                'json_key': "gear_feet"
+            }
+        }
         
-        if not chest_list or index < 0 or index >= len(chest_list):
+        if self.gear_type not in gear_config:
+            self.report({'ERROR'}, f"Unknown gear type: {self.gear_type}")
+            return {'CANCELLED'}
+        
+        config = gear_config[self.gear_type]
+        gear_list = config['list']
+        index = getattr(context.scene, config['index_prop'])
+        
+        if not gear_list or index < 0 or index >= len(gear_list):
             self.report({'WARNING'}, "No valid gear item selected")
             return {'CANCELLED'}
         
-        gear_item = chest_list[index]
+        gear_item = gear_list[index]
         obj = gear_item.obj_pointer
         
         # Remove shape keys from object
         if obj:
             remove_shape_keys(obj)
-            remove_gear_from_json(obj, "gear_chest")
+            remove_gear_from_json(obj, config['json_key'])
         
         # Remove from list
-        remove_gear_from_list(chest_list, index)
+        remove_gear_from_list(gear_list, index)
         
         # Adjust index if needed
-        if index >= len(chest_list) and len(chest_list) > 0:
-            context.scene.chest_gear_index = len(chest_list) - 1
+        if index >= len(gear_list) and len(gear_list) > 0:
+            setattr(context.scene, config['index_prop'], len(gear_list) - 1)
         
-        self.report({'INFO'}, "TBSE Body Kit: Chest gear removed.")
+        self.report({'INFO'}, f"TBSE Body Kit: {self.gear_type.title()} gear removed.")
         return {'FINISHED'}
+
+
+# Specific gear operators that call the generic ones
+class TBSEKIT_OT_chestGearAdd(Operator):
+    bl_idname = "object.chest_gear_add"
+    bl_label = "Add selected gear model to chest gear list"
+    bl_description = "This adds chest shape keys to the object"
+    bl_options = {'REGISTER','UNDO'}
+
+    def execute(self, context):
+        return bpy.ops.object.gear_add(gear_type='chest')
+
+
+class TBSEKIT_OT_chestGearRemove(Operator):
+    bl_idname = "object.chest_gear_remove"
+    bl_label = "Remove gear model from chest gear list"
+    bl_description = "THIS WILL REMOVE ALL SHAPEKEYS!"
+    bl_options = {'REGISTER','UNDO'}
+
+    def execute(self, context):
+        return bpy.ops.object.gear_remove(gear_type='chest')
+
 
 class TBSEKIT_OT_legGearAdd(Operator):
     bl_idname = "object.leg_gear_add"
@@ -578,36 +666,9 @@ class TBSEKIT_OT_legGearAdd(Operator):
     bl_description = "This adds leg shape keys to the object"
     bl_options = {'REGISTER','UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return True
-
     def execute(self, context):
-        # Add selected gear model to leg gear list
-        from .constants import SHAPE_KEY_MASTERS
-        
-        selected_objects = context.selected_objects
-        if not selected_objects:
-            self.report({'WARNING'}, "No objects selected")
-            return {'CANCELLED'}
-        
-        leg_list = context.scene.leg_gear_list
-        success_count = 0
-        
-        for obj in selected_objects:
-            if obj.type == 'MESH':
-                if add_gear_to_list(obj, leg_list, SHAPE_KEY_MASTERS['LEG']):
-                    add_gear_to_json(obj, "leg_gear_", "gear_legs")
-                    success_count += 1
-                else:
-                    self.report({'WARNING'}, f"Failed to add shape keys to {obj.name}")
-        
-        if success_count > 0:
-            self.report({'INFO'}, f"TBSE Body Kit: Added {success_count} leg gear item(s).")
-        else:
-            self.report({'WARNING'}, "No valid mesh objects were added")
-            
-        return {'FINISHED'}
+        return bpy.ops.object.gear_add(gear_type='leg')
+
 
 class TBSEKIT_OT_legGearRemove(Operator):
     bl_idname = "object.leg_gear_remove"
@@ -615,37 +676,9 @@ class TBSEKIT_OT_legGearRemove(Operator):
     bl_description = "THIS WILL REMOVE ALL SHAPEKEYS!"
     bl_options = {'REGISTER','UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return True
-
     def execute(self, context):
-        # Remove gear model from leg gear list
-        
-        leg_list = context.scene.leg_gear_list
-        index = context.scene.leg_gear_index
-        
-        if not leg_list or index < 0 or index >= len(leg_list):
-            self.report({'WARNING'}, "No valid gear item selected")
-            return {'CANCELLED'}
-        
-        gear_item = leg_list[index]
-        obj = gear_item.obj_pointer
-        
-        # Remove shape keys from object
-        if obj:
-            remove_shape_keys(obj)
-            remove_gear_from_json(obj, "gear_legs")
-        
-        # Remove from list
-        remove_gear_from_list(leg_list, index)
-        
-        # Adjust index if needed
-        if index >= len(leg_list) and len(leg_list) > 0:
-            context.scene.leg_gear_index = len(leg_list) - 1
-        
-        self.report({'INFO'}, "TBSE Body Kit: Leg gear removed.")
-        return {'FINISHED'}
+        return bpy.ops.object.gear_remove(gear_type='leg')
+
 
 class TBSEKIT_OT_handGearAdd(Operator):
     bl_idname = "object.hand_gear_add"
@@ -653,37 +686,9 @@ class TBSEKIT_OT_handGearAdd(Operator):
     bl_description = "This adds chest shape keys to the object"
     bl_options = {'REGISTER','UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return True
-
     def execute(self, context):
-        # Add selected gear model to hand gear list
-        from .constants import SHAPE_KEY_MASTERS
-        
-        selected_objects = context.selected_objects
-        if not selected_objects:
-            self.report({'WARNING'}, "No objects selected")
-            return {'CANCELLED'}
-        
-        hand_list = context.scene.hand_gear_list
-        success_count = 0
-        
-        for obj in selected_objects:
-            if obj.type == 'MESH':
-                # Hand gear uses chest master for shape keys
-                if add_gear_to_list(obj, hand_list, SHAPE_KEY_MASTERS['CHEST']):
-                    add_gear_to_json(obj, "hand_gear_", "gear_hands")
-                    success_count += 1
-                else:
-                    self.report({'WARNING'}, f"Failed to add shape keys to {obj.name}")
-        
-        if success_count > 0:
-            self.report({'INFO'}, f"TBSE Body Kit: Added {success_count} hand gear item(s).")
-        else:
-            self.report({'WARNING'}, "No valid mesh objects were added")
-            
-        return {'FINISHED'}
+        return bpy.ops.object.gear_add(gear_type='hand')
+
 
 class TBSEKIT_OT_handGearRemove(Operator):
     bl_idname = "object.hand_gear_remove"
@@ -691,37 +696,9 @@ class TBSEKIT_OT_handGearRemove(Operator):
     bl_description = "THIS WILL REMOVE ALL SHAPEKEYS!"
     bl_options = {'REGISTER','UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return True
-
     def execute(self, context):
-        # Remove gear model from hand gear list
-        
-        hand_list = context.scene.hand_gear_list
-        index = context.scene.hand_gear_index
-        
-        if not hand_list or index < 0 or index >= len(hand_list):
-            self.report({'WARNING'}, "No valid gear item selected")
-            return {'CANCELLED'}
-        
-        gear_item = hand_list[index]
-        obj = gear_item.obj_pointer
-        
-        # Remove shape keys from object
-        if obj:
-            remove_shape_keys(obj)
-            remove_gear_from_json(obj, "gear_hands")
-        
-        # Remove from list
-        remove_gear_from_list(hand_list, index)
-        
-        # Adjust index if needed
-        if index >= len(hand_list) and len(hand_list) > 0:
-            context.scene.hand_gear_index = len(hand_list) - 1
-        
-        self.report({'INFO'}, "TBSE Body Kit: Hand gear removed.")
-        return {'FINISHED'}
+        return bpy.ops.object.gear_remove(gear_type='hand')
+
 
 class TBSEKIT_OT_feetGearAdd(Operator):
     bl_idname = "object.feet_gear_add"
@@ -729,37 +706,9 @@ class TBSEKIT_OT_feetGearAdd(Operator):
     bl_description = "This adds leg shape keys to the object"
     bl_options = {'REGISTER','UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return True
-
     def execute(self, context):
-        # Add selected gear model to feet gear list
-        from .constants import SHAPE_KEY_MASTERS
-        
-        selected_objects = context.selected_objects
-        if not selected_objects:
-            self.report({'WARNING'}, "No objects selected")
-            return {'CANCELLED'}
-        
-        feet_list = context.scene.feet_gear_list
-        success_count = 0
-        
-        for obj in selected_objects:
-            if obj.type == 'MESH':
-                # Feet gear uses leg master for shape keys
-                if add_gear_to_list(obj, feet_list, SHAPE_KEY_MASTERS['LEG']):
-                    add_gear_to_json(obj, "feet_gear_", "gear_feet")
-                    success_count += 1
-                else:
-                    self.report({'WARNING'}, f"Failed to add shape keys to {obj.name}")
-        
-        if success_count > 0:
-            self.report({'INFO'}, f"TBSE Body Kit: Added {success_count} feet gear item(s).")
-        else:
-            self.report({'WARNING'}, "No valid mesh objects were added")
-            
-        return {'FINISHED'}
+        return bpy.ops.object.gear_add(gear_type='feet')
+
 
 class TBSEKIT_OT_feetGearRemove(Operator):
     bl_idname = "object.feet_gear_remove"
@@ -767,37 +716,8 @@ class TBSEKIT_OT_feetGearRemove(Operator):
     bl_description = "THIS WILL REMOVE ALL SHAPEKEYS!"
     bl_options = {'REGISTER','UNDO'}
 
-    @classmethod
-    def poll(cls, context):
-        return True
-
     def execute(self, context):
-        # Remove gear model from feet gear list
-        
-        feet_list = context.scene.feet_gear_list
-        index = context.scene.feet_gear_index
-        
-        if not feet_list or index < 0 or index >= len(feet_list):
-            self.report({'WARNING'}, "No valid gear item selected")
-            return {'CANCELLED'}
-        
-        gear_item = feet_list[index]
-        obj = gear_item.obj_pointer
-        
-        # Remove shape keys from object
-        if obj:
-            remove_shape_keys(obj)
-            remove_gear_from_json(obj, "gear_feet")
-        
-        # Remove from list
-        remove_gear_from_list(feet_list, index)
-        
-        # Adjust index if needed
-        if index >= len(feet_list) and len(feet_list) > 0:
-            context.scene.feet_gear_index = len(feet_list) - 1
-        
-        self.report({'INFO'}, "TBSE Body Kit: Feet gear removed.")
-        return {'FINISHED'}
+        return bpy.ops.object.gear_remove(gear_type='feet')
 
 
 # Registration
@@ -807,6 +727,8 @@ classes = (
     TBSEKIT_OT_rename,
     TBSEKIT_OT_importFBX,
     TBSEKIT_OT_exportFBX,
+    TBSEKIT_OT_gearAdd,
+    TBSEKIT_OT_gearRemove,
     TBSEKIT_OT_chestGearAdd,
     TBSEKIT_OT_chestGearRemove,
     TBSEKIT_OT_legGearAdd,
