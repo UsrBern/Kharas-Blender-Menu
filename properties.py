@@ -19,7 +19,7 @@ from .toggles import (
     gearToggle, modelNameChange
 )
 from .drivers import chest_driver, leg_driver
-from .gear_helpers import select_chest_gear, select_leg_gear, select_hand_gear, select_feet_gear
+from .operators import select_chest_gear, select_leg_gear, select_hand_gear, select_feet_gear
 
 
 class TBSEKIT_TBSEProperties(PropertyGroup):

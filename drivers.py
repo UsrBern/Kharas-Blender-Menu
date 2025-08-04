@@ -3,10 +3,10 @@
 import bpy
 from .constants import SHAPE_KEY_MASTERS, CHEST_SHAPE_CATEGORIES, LEG_SHAPE_CATEGORIES, MODEL_GROUPS
 from .utils import (
-    ModelCache, reset_shape_keys, set_shape_key_value, 
-    set_active_shape_key_for_objects, get_shape_category_index,
-    get_models_by_groups
+    reset_shape_keys, set_shape_key_value, 
+    set_active_shape_key_for_objects
 )
+from .json_helpers import getTextBlock, getModelsInList
 
 def chest_resetDrivers():
     # Reset all chest shape keys back to TBSE (Basis).
@@ -34,33 +34,29 @@ def chest_driver(self, context):
     from .toggles import chestToggle  # Import here to avoid circular imports
     chestToggle(self, context)
 
-    # Get model lists efficiently using cache
-    model_groups = get_models_by_groups([
-        MODEL_GROUPS['BODY_CHEST'],
-        MODEL_GROUPS['GEAR_CHEST'], 
-        MODEL_GROUPS['GEAR_HANDS']
-    ])
+    # Get model lists
+    model_dict = getTextBlock()
+    chest_models = getModelsInList(model_dict, MODEL_GROUPS['BODY_CHEST'])
+    gear_chest_models = getModelsInList(model_dict, MODEL_GROUPS['GEAR_CHEST'])
+    gear_hands_models = getModelsInList(model_dict, MODEL_GROUPS['GEAR_HANDS'])
     
     # Combine all model lists
-    all_models = []
-    for group_models in model_groups.values():
-        all_models.extend(group_models)
-
+    all_models = chest_models + gear_chest_models + gear_hands_models
+    
     # Set active shape key for all objects with chest shape keys
     chest_shape = tbse_properties.chest_shape
     for obj_name in all_models:
         if obj_name in bpy.data.objects:
             shape_index = index
             
-            # Special handling for elbows and wrists (indices 1-2 in hands gear)
-            if (len(all_models) > 2 and 
-                obj_name in model_groups.get(MODEL_GROUPS['GEAR_HANDS'], [])):
-                
-                shape_index = get_shape_category_index(chest_shape, CHEST_SHAPE_CATEGORIES)
-                
-                # Special cases for XL
-                if chest_shape == 'xl':
-                    shape_index = 3
+            # Special handling for hands gear - use simpler mapping
+            if obj_name in gear_hands_models:
+                shape_categories = {
+                    'tbse': 0, 'slim': 1, 'w': 1, 'sbtl': 1, 'sbtlslimmer': 1,
+                    'twink': 2, 'twunk': 2, 'hunk': 2, 'offtwunk': 2, 'offhunk': 2,
+                    'chonk': 3, 'chonk1': 3, 'cub': 3, 'xl': 3
+                }
+                shape_index = shape_categories.get(chest_shape, 0)
             
             set_active_shape_key_for_objects([obj_name], shape_index)
 
@@ -90,36 +86,19 @@ def leg_driver(self, context):
     from .toggles import legToggle  # Import here to avoid circular imports
     legToggle(self, context)
 
-    # Get model lists efficiently using cache
-    model_groups = get_models_by_groups([
-        MODEL_GROUPS['BODY_LEGS'],
-        MODEL_GROUPS['GEAR_LEGS'],
-        MODEL_GROUPS['GEAR_FEET']
-    ])
+    # Get model lists
+    model_dict = getTextBlock()
+    leg_models = getModelsInList(model_dict, MODEL_GROUPS['BODY_LEGS'])
+    gear_legs_models = getModelsInList(model_dict, MODEL_GROUPS['GEAR_LEGS'])
+    gear_feet_models = getModelsInList(model_dict, MODEL_GROUPS['GEAR_FEET'])
     
     # Combine all model lists
-    all_models = []
-    for group_models in model_groups.values():
-        all_models.extend(group_models)
+    all_models = leg_models + gear_legs_models + gear_feet_models
 
     # Set active shape key for all objects with leg shape keys
-    leg_shape = tbse_properties.leg_shape
     for obj_name in all_models:
         if obj_name in bpy.data.objects:
-            shape_index = index
-            
-            # Special handling for shin and knee models (indices 0-1 in legs)
-            if (len(all_models) >= 2 and 
-                obj_name in model_groups.get(MODEL_GROUPS['BODY_LEGS'], [])[:2]):
-                
-                if leg_shape in LEG_SHAPE_CATEGORIES['HUNK_SBTL']:
-                    shape_index = 1
-                elif leg_shape in LEG_SHAPE_CATEGORIES['XL']:
-                    shape_index = 2
-                else:
-                    shape_index = 0
-            
-            set_active_shape_key_for_objects([obj_name], shape_index)
+            set_active_shape_key_for_objects([obj_name], index)
 
 def afab_ResetDrivers():
     # Reset all AFAB shape keys back to Gen A (Basis).

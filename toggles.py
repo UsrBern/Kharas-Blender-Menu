@@ -3,8 +3,8 @@
 import bpy
 from .constants import MODEL_GROUPS, SHAPE_SPECIFIC_MODELS, SPECIAL_INDICES, SKELETON_OBJECTS
 from .utils import (
-    ModelCache, safe_hide_objects, get_models_by_groups, batch_toggle_visibility,
-    manage_skeleton_visibility, get_genital_model_by_type, show_single_model_by_index
+    safe_hide_objects, batch_toggle_visibility, show_single_model,
+    manage_skeleton_visibility
 )
 from .json_helpers import getTextBlock, getModelsInList, setTextBlock, setModelName
 
