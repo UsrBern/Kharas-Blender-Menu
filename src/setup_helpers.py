@@ -12,7 +12,7 @@ def install_models_data():
     try:
         # Get the addon directory
         addon_dir = os.path.dirname(os.path.abspath(__file__))
-        models_file_path = os.path.join(addon_dir, "tbse models")
+        models_file_path = os.path.join(addon_dir, "data", "tbse models")
         
         # Read the models file
         if os.path.exists(models_file_path):

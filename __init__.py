@@ -10,15 +10,15 @@ bl_info = {
 }
 
 import bpy
-from . import properties
-from . import operators
-from . import panels
-from . import lists
-from . import json_helpers
-from . import drivers
-from . import constants
-from . import utils
-from . import setup_helpers
+from .src import properties
+from .src import operators
+from .src import panels
+from .src import lists
+from .src import json_helpers
+from .src import drivers
+from .src import constants
+from .src import utils
+from .src import setup_helpers
 
 def register():
     # Register in dependency order: properties first, then UI components
