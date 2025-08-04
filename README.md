@@ -5,7 +5,7 @@ A Blender addon for FFXIV character modeling and body modification. Provides too
 ## Installation
 
 ### Method 1: ZIP Installation (Recommended)
-1. Go to the [Releases page](https://github.com/UsrBern/Kharas-Blender-Menu/releases/tag/v0.0.0) and download the latest ZIP
+1. Go to the [releases page](https://github.com/UsrBern/Kharas-Blender-Menu/releases/tag/v0.0.0) and download the latest ZIP
 2. In Blender: Edit → Preferences → Add-ons → Install
 3. Select the ZIP file and click "Install Add-on"
 4. Enable "TBSE Body Kit" in the addon list
