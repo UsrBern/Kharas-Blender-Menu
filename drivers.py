@@ -1,17 +1,6 @@
 # Driver functions for TBSE Body Kit addon.
 import bpy
-from json_helpers import getTextBlock, getModelsInList
-
-def chest_resetDrivers():
-    # Reset all chest shape keys back to TBSE (Basis).
-    try:
-        for key in bpy.data.shape_keys["Chest Master"].key_blocks:
-            key.value = 0
-    except KeyError:
-        # Handle case where "Chest Master" shape keys don't exist
-        print("Warning: Chest Master shape keys not found. Skipping chest shape reset.")
-        return False
-    return True
+from .json_helpers import getTextBlock, getModelsInList
 
 def chest_driver(self, context):
     # Driver logic for chest shape keys.
@@ -33,7 +22,7 @@ def chest_driver(self, context):
             return False
     
     # Chest model logic in case shape was changed to/from chonk or w
-    from operators import chestToggle  # Import here to avoid circular imports
+    from .toggles import chestToggle  # Import here to avoid circular imports
     chestToggle(self, context)
 
     # Create list of object names of all models with chest shapekeys
@@ -96,7 +85,7 @@ def leg_driver(self, context):
             return False
     
     # Leg model logic in case shape was changed to or from chonk
-    from operators import legToggle  # Import here to avoid circular imports
+    from .toggles import legToggle  # Import here to avoid circular imports
     legToggle(self, context)
 
     # Create list of object names of all models with leg shapekeys
@@ -137,7 +126,7 @@ def afab_ResetDrivers():
     return True
 
 def afab_driver(self, context):
-    # Driver logic for afab shape keys.
+    # Driver logic for AFAB genital shape changes.
     tbse_properties = context.scene.tbse_kit_properties
     
     # Reset shape before changing to another shape
@@ -152,3 +141,33 @@ def afab_driver(self, context):
             # Handle case where shape keys don't exist or index is invalid
             print(f"Warning: Could not set AFAB shape key at index {index}. Shape keys may not exist or index is invalid.")
             return False
+    return True
+
+def amab_ResetDrivers():
+    # Reset all amab shape keys back to Gen A (Basis).
+    try:
+        for key in bpy.data.shape_keys["AMAB Master"].key_blocks:
+            key.value = 0
+    except KeyError:
+        # Handle case where "AMAB Master" shape keys don't exist
+        print("Warning: AMAB Master shape keys not found. Skipping AMAB shape reset.")
+        return False
+    return True
+
+def amab_driver(self, context):
+    # Driver logic for AMAB genital shape changes.
+    tbse_properties = context.scene.tbse_kit_properties
+
+    # Reset shape before changing to another shape
+    amab_ResetDrivers()
+
+    if not tbse_properties.amab_type == 'a':  # if not default Gen A, change shape depending on shape enum value
+        amab_shape = tbse_properties.bl_rna.properties.get('amab_type')
+        index = amab_shape.enum_items.find(tbse_properties.amab_type)
+        try:
+            bpy.data.shape_keys["AMAB Master"].key_blocks[index].value = 1
+        except (KeyError, IndexError):
+            # Handle case where shape keys don't exist or index is invalid
+            print(f"Warning: Could not set AMAB shape key at index {index}. Shape keys may not exist or index is invalid.")
+            return False
+    return True
