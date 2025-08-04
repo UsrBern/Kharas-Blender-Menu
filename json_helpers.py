@@ -1,4 +1,3 @@
-
 # JSON helper functions for TBSE Body Kit addon.
 import bpy
 import json

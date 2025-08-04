@@ -1,5 +1,8 @@
 
+# Operators for TBSE Body Kit Blender Addon
+# This module defines various operators for managing body kit models, importing/exporting FBX files, and modifying model properties.
 import bpy
+import os
 from bpy.types import Operator
 from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty, PointerProperty, CollectionProperty
 from bpy_extras.io_utils import ImportHelper, ExportHelper
@@ -70,12 +73,115 @@ class TBSEKIT_OT_importFBX(Operator, ImportHelper):
 
     def execute(self, context):
         # Import FBX files with selected options
-        # This is a stub; actual import logic would go here
-        self.report({'INFO'}, "TBSE Body Kit: FBX import complete.")
+        directory = os.path.dirname(self.filepath)
+        imported_objects = []
+        
+        for file_elem in self.files:
+            filepath = os.path.join(directory, file_elem.name)
+            # Store current objects to determine what was imported
+            pre_import_objects = set(bpy.context.scene.objects)
+            
+            # Import FBX
+            bpy.ops.import_scene.fbx(
+                filepath=filepath,
+                use_manual_orientation=True,
+                global_scale=1.0,
+                bake_space_transform=False,
+                use_custom_normals=True,
+                use_image_search=True,
+                use_alpha_decals=False,
+                decal_offset=0.0,
+                use_anim=True,
+                anim_offset=1.0,
+                use_subsurf=False,
+                use_custom_props=True,
+                use_custom_props_enum_as_string=True,
+                ignore_leaf_bones=False,
+                force_connect_children=False,
+                automatic_bone_orientation=False,
+                primary_bone_axis='Y',
+                secondary_bone_axis='X',
+                use_prepost_rot=True
+            )
+            
+            # Determine what was imported
+            post_import_objects = set(bpy.context.scene.objects)
+            new_objects = list(post_import_objects - pre_import_objects)
+            imported_objects.extend(new_objects)
+            
+            # Clean up the imported objects
+            if new_objects:
+                # Select the imported objects
+                bpy.ops.object.select_all(action='DESELECT')
+                for obj in new_objects:
+                    obj.select_set(True)
+                
+                # Call cleanup function
+                cleanImport(self, new_objects)
+        
+        self.report({'INFO'}, f"TBSE Body Kit: Imported {len(self.files)} FBX file(s) with cleanup.")
         return {'FINISHED'}
 
 def cleanImport(self, imported):
-    pass
+    # Clean up the imported mesh:
+    # - clear parents
+    # - [OPTIONAL] changes skeleton axis for easy viewing
+    # - [OPTIONAL] removes unwanted empties
+    # - [OPTIONAL] fixes alpha + metalic mat (attributed code from MekTools with permission)
+    # - [OPTIONAL] assigns armature to existing 'Skeleton'
+    
+    bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+
+    meshes = []
+    junk = []
+
+    # organizing all objects imported
+    for obj in imported:
+        if obj.type == 'MESH':
+            meshes.append(obj)
+        else:
+            junk.append(obj)
+    
+    for obj in meshes:
+        # OPTIONAL SETTING: fix materials (attributed code from MekTools with permission)
+        if self.fix_materials:
+            for mat_slot in obj.material_slots:
+                if mat_slot.material:
+                    mat = mat_slot.material
+                    mat.blend_method = 'HASHED'
+                    # Fix metallic values
+                    if mat.use_nodes:
+                        for node in mat.node_tree.nodes:
+                            if node.type == 'BSDF_PRINCIPLED':
+                                node.inputs['Metallic'].default_value = 0.0
+        
+        # OPTIONAL SETTING: auto assign armature
+        if self.auto_assign_armature:
+            if "Skeleton" in bpy.data.objects:
+                skeleton = bpy.data.objects["Skeleton"]
+                # Add armature modifier
+                armature_mod = obj.modifiers.new(name="Armature", type='ARMATURE')
+                armature_mod.object = skeleton
+        
+        obj.select_set(False)  # deselect mesh objects
+    
+    # OPTIONAL SETTING: delete junk
+    if self.delete_junk:
+        for obj in junk:
+            obj.select_set(True)
+    
+    if self.delete_junk and junk:
+        bpy.ops.object.delete()  # delete all junk objects still selected
+    
+    # OPTIONAL SETTING: fix skeleton
+    if self.fix_skeleton and "Skeleton" in bpy.data.objects:
+        skeleton = bpy.data.objects["Skeleton"]
+        skeleton.select_set(True)
+        bpy.context.view_layer.objects.active = skeleton
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.armature.select_all(action='SELECT')
+        bpy.ops.transform.rotate(value=1.5708, orient_axis='X')  # Rotate 90 degrees on X axis
+        bpy.ops.object.mode_set(mode='OBJECT')
 
 class TBSEKIT_OT_exportFBX(Operator, ExportHelper):
     bl_idname = "object.exportfbx"

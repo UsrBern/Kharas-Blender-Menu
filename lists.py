@@ -1,3 +1,5 @@
+# List definitions for TBSE Body Kit addon
+# Contains custom UIList classes for displaying gear items in the UI
 import bpy
 from bpy.types import UIList
 

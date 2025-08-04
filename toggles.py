@@ -1,14 +1,11 @@
-"""
-Toggle functions for TBSE Body Kit addon
-These functions handle visibility toggles for various gear and piercing models
-"""
-
+# Toggle functions for TBSE Body Kit addon
+# These functions handle visibility toggles for various gear and piercing models
 import bpy
 from .json_helpers import getTextBlock, getModelsInList, setTextBlock, setModelName
 
 
 def chestToggle(self, context):
-    """Toggle visibility of chest models"""
+    # Toggle visibility of chest models
     tbse_properties = context.scene.tbse_kit_properties
     chest_shape = tbse_properties.chest_shape
     modelDict = getTextBlock()
@@ -44,7 +41,7 @@ def chestToggle(self, context):
 
 
 def legToggle(self, context):
-    """Toggle visibility of leg models"""
+    # Toggle visibility of leg models
     tbse_properties = context.scene.tbse_kit_properties
     leg_shape = tbse_properties.leg_shape
     modelDict = getTextBlock()
@@ -76,7 +73,7 @@ def legToggle(self, context):
 
 
 def nsfwToggle(self, context):
-    """Toggle visibility of NSFW models"""
+    # Toggle visibility of NSFW models
     tbse_properties = context.scene.tbse_kit_properties
     modelDict = getTextBlock()
 
@@ -104,7 +101,7 @@ def nsfwToggle(self, context):
 
 
 def handToggle(self, context):
-    """Toggle visibility of hand models"""
+    # Toggle visibility of hand models
     tbse_properties = context.scene.tbse_kit_properties
     modelDict = getTextBlock()
 
@@ -116,7 +113,7 @@ def handToggle(self, context):
 
 
 def feetToggle(self, context):
-    """Toggle visibility of feet models"""
+    # Toggle visibility of feet models
     tbse_properties = context.scene.tbse_kit_properties
     modelDict = getTextBlock()
     
@@ -128,7 +125,7 @@ def feetToggle(self, context):
 
 
 def genitalToggle(self, context):
-    """Toggle between AMAB and AFAB genital types"""
+    # Toggle between AMAB and AFAB genital types
     tbse_properties = context.scene.tbse_kit_properties
     modelDict = getTextBlock()
 
@@ -149,7 +146,7 @@ def genitalToggle(self, context):
 
 
 def bpfToggle(self, context):
-    """Toggle visibility of BPF models"""
+    # Toggle visibility of BPF models
     tbse_properties = context.scene.tbse_kit_properties
     modelDict = getTextBlock()
 
@@ -167,7 +164,7 @@ def bpfToggle(self, context):
 
 
 def genitalSet(self, context):
-    """Set specific genital model based on type selection"""
+    # Set specific genital model based on type selection
     tbse_properties = context.scene.tbse_kit_properties
     modelDict = getTextBlock()
 
@@ -199,7 +196,7 @@ def genitalSet(self, context):
 
 
 def boneToggles(self, context):
-    """Toggle visibility of different bone layers"""
+    # Toggle visibility of different bone layers
     tbse_properties = context.scene.tbse_kit_properties
     obj = bpy.data.objects["Skeleton"]
     skele = bpy.data.armatures["Skeleton"]
@@ -226,65 +223,8 @@ def boneToggles(self, context):
     else: skele.layers[17] = False
 
 
-def chest_driver(self, context):
-    """Driver function for chest shape changes"""
-    tbse_properties = context.scene.tbse_kit_properties
-    modelDict = getTextBlock()
-    # reset shape before changing to another shape
-    from .drivers import chest_resetDrivers
-    chest_resetDrivers()
-    index = 0
-    if not tbse_properties.chest_shape == 'tbse' : # if not default tbse, change shape depending on shape enum value
-        chest_type = tbse_properties.bl_rna.properties.get('chest_shape')
-        index = chest_type.enum_items.find(tbse_properties.chest_shape)
-        bpy.data.shape_keys["Chest Master"].key_blocks[index].value = 1
-    # chest model logic in case shape was changed to/from chonk or w
-    chestToggle(self, context)
-
-    # create list of object names of all models with chest shapekeys
-    modelList = getModelsInList(modelDict, "body_chest")
-    modelList.extend(getModelsInList(modelDict, "gear_chest"))
-    modelList.extend(getModelsInList(modelDict, "gear_hands"))
-
-    # change all objects with chest shapekeys to selected shape as active key
-    chest_shape = tbse_properties.chest_shape
-    for obj in modelList: 
-        shp_index = index
-        # if models are the elbows and wrists, change index to appropriate type
-        if obj == modelList[1] or obj == modelList[2]:
-            slim = ['slim','sbtl','sbtlslimmer']
-            hunk = ['hunk','offhunk']
-            if chest_shape in slim: shp_index = 1
-            elif chest_shape in hunk: shp_index = 2
-            elif chest_shape == 'xl': shp_index = 3
-            else: shp_index = 0
-        bpy.data.objects[obj].active_shape_key_index = shp_index
-
-
-def leg_driver(self, context):
-    """Driver function for leg shape changes"""
-    tbse_properties = context.scene.tbse_kit_properties
-    modelDict = getTextBlock()
-
-    # reset shape before changing to another shape
-    from .drivers import leg_resetDrivers
-    leg_resetDrivers()
-    index = 0
-    if not tbse_properties.leg_shape == 'tbse' : # if not default tbse, change shape depending on shape enum value
-        leg_type = tbse_properties.bl_rna.properties.get('leg_shape')
-        index = leg_type.enum_items.find(tbse_properties.leg_shape)
-        bpy.data.shape_keys["Leg Master"].key_blocks[index].value = 1
-    # leg model logic in case shape was changed to or from chonk
-    legToggle(self, context)
-
-    # create list of object names of all models with leg shapekeys
-    modelList = getModelsInList(modelDict, "body_legs")
-    modelList.extend(getModelsInList(modelDict, "gear_legs"))
-    modelList.extend(getModelsInList(modelDict, "gear_feet"))
-
-
 def chestPiercingToggle(self, context):
-    """Toggle visibility of chest piercing models"""
+    # Toggle visibility of chest piercing models
     tbse_properties = context.scene.tbse_kit_properties
     chest_toggles = context.scene.tbse_chest_toggles
     modelDict = getTextBlock()
@@ -304,7 +244,7 @@ def chestPiercingToggle(self, context):
 
 
 def amabPiercingToggle(self, context):
-    """Toggle visibility of amab piercing models"""
+    # Toggle visibility of amab piercing models
     tbse_properties = context.scene.tbse_kit_properties
     amab_toggles = context.scene.tbse_amab_toggles
     modelDict = getTextBlock()
@@ -324,7 +264,7 @@ def amabPiercingToggle(self, context):
 
 
 def gearListToggle(isEnabled, gearList):
-    """Helper function to toggle visibility of a gear list"""
+    # Helper function to toggle visibility of a gear list
     for obj in gearList:
         if isEnabled and obj.isEnabled: 
             obj.obj_pointer.hide_set(False)
@@ -333,35 +273,35 @@ def gearListToggle(isEnabled, gearList):
 
 
 def chestGearToggle(self, context):
-    """Toggle visibility of chest gear"""
+    # Toggle visibility of chest gear
     tbse_properties = context.scene.tbse_kit_properties
     gear_list = context.scene.chest_gear_list
     gearListToggle(tbse_properties['show_chest_gear'], gear_list)
 
 
 def legGearToggle(self, context):
-    """Toggle visibility of leg gear"""
+    # Toggle visibility of leg gear
     tbse_properties = context.scene.tbse_kit_properties
     gear_list = context.scene.leg_gear_list
     gearListToggle(tbse_properties['show_leg_gear'], gear_list)
 
 
 def handGearToggle(self, context):
-    """Toggle visibility of hand gear"""
+    # Toggle visibility of hand gear
     tbse_properties = context.scene.tbse_kit_properties
     gear_list = context.scene.hand_gear_list
     gearListToggle(tbse_properties['show_hand_gear'], gear_list)
 
 
 def feetGearToggle(self, context):
-    """Toggle visibility of feet gear"""
+    # Toggle visibility of feet gear
     tbse_properties = context.scene.tbse_kit_properties
     gear_list = context.scene.feet_gear_list
     gearListToggle(tbse_properties['show_feet_gear'], gear_list)
 
 
 def gearToggle(self, context):
-    """Toggle visibility of individual gear item"""
+    # Toggle visibility of individual gear item
     obj = self.obj_pointer
     if self.isEnabled: 
         obj.hide_set(False)
@@ -370,7 +310,7 @@ def gearToggle(self, context):
 
 
 def modelNameChange(self, context):
-    """Update model name when gear list item name is changed"""
+    # Update model name when gear list item name is changed
     modelDict = getTextBlock()
     obj = self.obj_pointer
     if obj:

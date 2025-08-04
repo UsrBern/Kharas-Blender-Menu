@@ -1,4 +1,5 @@
-
+# Panel definitions for TBSE Body Kit addon
+# This file contains all the UI panels for the addon, including main controls, body part toggles, shape options, gear lists, and advanced features.
 import bpy
 from bpy.types import Panel, Menu
 
@@ -126,7 +127,7 @@ class TBSEKIT_PT_feetGearList(TBSEKIT_View3DPanel, Panel):
         layout.label(text="Feet Gear List")
 
 class TBSEKIT_PT_boneGroups(TBSEKIT_View3DPanel, Panel):
-    """Panel for bone group toggles."""
+    # Panel for bone group toggles.
     bl_idname = "TBSEKIT_PT_boneGroups"
     bl_label = "Bone Groups"
 

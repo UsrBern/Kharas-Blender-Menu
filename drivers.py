@@ -1,4 +1,5 @@
 # Driver functions for TBSE Body Kit addon.
+# This module contains driver logic for chest and leg shape keys, as well as genital shape changes.
 import bpy
 from .json_helpers import getTextBlock, getModelsInList
 

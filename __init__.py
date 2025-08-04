@@ -1,11 +1,10 @@
 # TBSE Body Kit Blender Addon initialization.
-
 bl_info = {
     "name": "TBSE Body Kit",
-    "author": "Crow",
-    "description": "Script to be used in conjunction with TBSE Upscale Kit. Includes multiple TBSE bodies.",
+    "author": "Crow, UsrBern",
+    "description": "Script to be used in conjunction with TBSE Upscale Kit. Includes multiple TBSE bodies. This is a refactored version of Crow's original addon.",
     "blender": (2, 80, 0),
-    "version": (1, 0, 0),
+    "version": (2, 0, 0),
     "location": "View3D > Sidebar > Body Kit",
     "category": "3D View"
 }
