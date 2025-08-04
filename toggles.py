@@ -1,6 +1,8 @@
 # Toggle functions for TBSE Body Kit addon
 # These functions handle visibility toggles for various gear and piercing models
 import bpy
+from .constants import MODEL_GROUPS, SHAPE_SPECIFIC_MODELS
+from .utils import ModelCache, safe_hide_objects, get_models_by_groups, batch_toggle_visibility
 from .json_helpers import getTextBlock, getModelsInList, setTextBlock, setModelName
 
 
@@ -8,68 +10,92 @@ def chestToggle(self, context):
     # Toggle visibility of chest models
     tbse_properties = context.scene.tbse_kit_properties
     chest_shape = tbse_properties.chest_shape
-    modelDict = getTextBlock()
-
-    # get object names of all chest models
-    tbse_neck = getModelsInList(modelDict, "body_neck")
-    body_chest = getModelsInList(modelDict, "body_chest")
-    body_chest_w = getModelsInList(modelDict, "body_chest_w")
-    body_chest_chonk = getModelsInList(modelDict, "body_chest_chonk")
-    body_chest_chonk1 = getModelsInList(modelDict, "body_chest_chonk1")
-    piercings_chest = getModelsInList(modelDict, "piercings_chest")
     
-    # hides all chest models
-    bpy.data.objects[tbse_neck[0]].hide_set(True)
-    for obj in body_chest: bpy.data.objects[obj].hide_set(True)
-    for obj in body_chest_w: bpy.data.objects[obj].hide_set(True)
-    for obj in body_chest_chonk: bpy.data.objects[obj].hide_set(True)
-    for obj in body_chest_chonk1: bpy.data.objects[obj].hide_set(True)
-    for obj in piercings_chest: bpy.data.objects[obj].hide_set(True)
-
-    # if CHEST TOGGLE enabled, show chest pieces -->
+    # Get all chest-related model groups efficiently
+    chest_groups = [
+        MODEL_GROUPS['BODY_NECK'],
+        MODEL_GROUPS['BODY_CHEST'],
+        MODEL_GROUPS['BODY_CHEST_W'],
+        MODEL_GROUPS['BODY_CHEST_CHONK'],
+        MODEL_GROUPS['BODY_CHEST_CHONK1'],
+        MODEL_GROUPS['PIERCINGS_CHEST']
+    ]
+    
+    model_data = get_models_by_groups(chest_groups)
+    
+    # Hide all chest models initially
+    for group in chest_groups:
+        if group in model_data:
+            safe_hide_objects(model_data[group], hide=True)
+    
+    # Show appropriate models if chest toggle is enabled
     if tbse_properties['show_chest']:
-        bpy.data.objects[tbse_neck[0]].hide_set(False) # enable neck
-        if chest_shape == 'w': # if CHEST SHAPE is type w, show type w body models
-            for obj in body_chest_w: bpy.data.objects[obj].hide_set(False)
-        elif chest_shape == 'chonk': # if CHEST SHAPE is chonk, show chonk body models
-            for obj in body_chest_chonk: bpy.data.objects[obj].hide_set(False)
-        elif chest_shape == 'chonk1' or chest_shape == 'cub': #if CHEST SHAPE is chonk 1.0 or cub, show other chonk body models
-            for obj in body_chest_chonk1: bpy.data.objects[obj].hide_set(False)
-        else: # if CHEST SHAPE is anything else, show base tbse body models
-            for obj in body_chest: bpy.data.objects[obj].hide_set(False)
-        if tbse_properties['show_piercings_chest']: chestPiercingToggle(self, context)
+        # Always show neck
+        neck_models = model_data.get(MODEL_GROUPS['BODY_NECK'], [])
+        if neck_models:
+            safe_hide_objects(neck_models, hide=False)
+        
+        # Show appropriate chest models based on shape
+        if chest_shape == 'w':
+            safe_hide_objects(model_data.get(MODEL_GROUPS['BODY_CHEST_W'], []), hide=False)
+        elif chest_shape == 'chonk':
+            safe_hide_objects(model_data.get(MODEL_GROUPS['BODY_CHEST_CHONK'], []), hide=False)
+        elif chest_shape in ['chonk1', 'cub']:
+            safe_hide_objects(model_data.get(MODEL_GROUPS['BODY_CHEST_CHONK1'], []), hide=False)
+        else:
+            # Default to base TBSE chest models
+            safe_hide_objects(model_data.get(MODEL_GROUPS['BODY_CHEST'], []), hide=False)
+        
+        # Handle chest piercings if enabled
+        if tbse_properties['show_piercings_chest']:
+            chestPiercingToggle(self, context)
 
 
 def legToggle(self, context):
     # Toggle visibility of leg models
     tbse_properties = context.scene.tbse_kit_properties
     leg_shape = tbse_properties.leg_shape
-    modelDict = getTextBlock()
-
-    # get object names of all leg models
-    body_legs = getModelsInList(modelDict, "body_legs")
-    body_legs_chonk = getModelsInList(modelDict, "body_legs_chonk")
-    body_genitals = getModelsInList(modelDict, "body_genitals")
-
-    # hides all leg models
-    for obj in body_legs: bpy.data.objects[obj].hide_set(True)
-    for obj in body_legs_chonk: bpy.data.objects[obj].hide_set(True)
-    for obj in body_genitals: bpy.data.objects[obj].hide_set(True)
-
-    # if LEG TOGGLE enabled, show leg pieces -->
+    
+    # Get all leg-related model groups efficiently  
+    leg_groups = [
+        MODEL_GROUPS['BODY_LEGS'],
+        'body_legs_chonk',  # This seems to be a special case
+        'body_genitals'     # This also seems to be special
+    ]
+    
+    model_data = get_models_by_groups(leg_groups)
+    
+    # Hide all leg models initially
+    for group in leg_groups:
+        if group in model_data:
+            safe_hide_objects(model_data[group], hide=True)
+    
+    # Show appropriate models if leg toggle is enabled
     if tbse_properties['show_legs']:
-        if leg_shape == 'chonk' : # if LEG SHAPE is chonk, show chonk leg models
-            for obj in body_legs_chonk: bpy.data.objects[obj].hide_set(False)
-            setattr(tbse_properties,'genital_toggle','amab') # force set genital toggles to amab
-        else: # if LEG SHAPE is anything else, show base tbse leg models
-            for obj in body_legs: bpy.data.objects[obj].hide_set(False)
-            # if LEG SHAPE is tbse xl, force amab legs and genital toggles
+        genitals = model_data.get('body_genitals', [])
+        
+        if leg_shape == 'chonk':
+            # Show chonk leg models and force AMAB genital toggle
+            safe_hide_objects(model_data.get('body_legs_chonk', []), hide=False)
+            setattr(tbse_properties, 'genital_toggle', 'amab')
+        else:
+            # Show base TBSE leg models
+            safe_hide_objects(model_data.get(MODEL_GROUPS['BODY_LEGS'], []), hide=False)
+            
+            # Handle genital visibility based on genital toggle and XL shape
             if tbse_properties.genital_toggle == 'amab' or leg_shape == 'xl':
-                if leg_shape == 'xl': setattr(tbse_properties,'genital_toggle','amab')
-                bpy.data.objects[body_genitals[0]].hide_set(False) # body_genitals[0] = AMAB butt
-            else: bpy.data.objects[body_genitals[1]].hide_set(False) # body_genitals[1] = AFAB butt
-    # else: setattr(tbse_properties,'show_nsfw',False)
-    nsfwToggle(self, context) # check nsfw toggles
+                if leg_shape == 'xl':
+                    setattr(tbse_properties, 'genital_toggle', 'amab')
+                # Show AMAB butt (index 0)
+                if genitals and len(genitals) > 0:
+                    safe_hide_objects([genitals[0]], hide=False)
+            else:
+                # Show AFAB butt (index 1)
+                if genitals and len(genitals) > 1:
+                    safe_hide_objects([genitals[1]], hide=False)
+    
+    # Trigger NSFW toggle check
+    nsfwToggle(self, context)
 
 
 def nsfwToggle(self, context):
@@ -100,28 +126,43 @@ def nsfwToggle(self, context):
         if tbse_properties['show_piercings_amab']: amabPiercingToggle(self, context)
 
 
-def handToggle(self, context):
-    # Toggle visibility of hand models
+def _simple_body_part_toggle(context, part_name: str, show_property: str):
+    # Generic function for simple body part visibility toggles.
     tbse_properties = context.scene.tbse_kit_properties
-    modelDict = getTextBlock()
+    
+    # Map part names to model groups
+    part_to_group = {
+        'hands': MODEL_GROUPS['BODY_HANDS'],
+        'feet': MODEL_GROUPS['BODY_FEET'],
+        'bpf': 'genitals_bpf'  # Special case for BPF
+    }
+    
+    if part_name not in part_to_group:
+        print(f"Warning: Unknown body part '{part_name}' in toggle function.")
+        return
+    
+    model_group = part_to_group[part_name]
+    model_data = get_models_by_groups([model_group])
+    models = model_data.get(model_group, [])
+    
+    # Toggle visibility based on property
+    show = tbse_properties.get(show_property, False)
+    safe_hide_objects(models, hide=not show)
 
-    body_hands = getModelsInList(modelDict, "body_hands")
-    if tbse_properties['show_hands']:
-        bpy.data.objects[body_hands[0]].hide_set(False)
-    else: 
-        bpy.data.objects[body_hands[0]].hide_set(True)
+
+def handToggle(self, context):
+    """Toggle visibility of hand models."""
+    _simple_body_part_toggle(context, 'hands', 'show_hands')
 
 
 def feetToggle(self, context):
-    # Toggle visibility of feet models
-    tbse_properties = context.scene.tbse_kit_properties
-    modelDict = getTextBlock()
-    
-    body_feet = getModelsInList(modelDict, "body_feet")
-    if tbse_properties['show_feet']:
-        bpy.data.objects[body_feet[0]].hide_set(False)
-    else: 
-        bpy.data.objects[body_feet[0]].hide_set(True)
+    """Toggle visibility of feet models.""" 
+    _simple_body_part_toggle(context, 'feet', 'show_feet')
+
+
+def bpfToggle(self, context):
+    """Toggle visibility of BPF models."""
+    _simple_body_part_toggle(context, 'bpf', 'show_bpf')
 
 
 def genitalToggle(self, context):
@@ -146,21 +187,23 @@ def genitalToggle(self, context):
 
 
 def bpfToggle(self, context):
-    # Toggle visibility of BPF models
+    # Toggle visibility of BPF models with complex logic.
     tbse_properties = context.scene.tbse_kit_properties
-    modelDict = getTextBlock()
-
-    # get object names of bpf models
-    genitals_bpf = getModelsInList(modelDict, "genitals_bpf")
-
-    # if LEG SHAPE is chonk or xl, do nothing
-    if tbse_properties.leg_shape == 'chonk' or tbse_properties.leg_shape == 'xl':
+    
+    # Get BPF models efficiently
+    model_data = get_models_by_groups(['genitals_bpf'])
+    bpf_models = model_data.get('genitals_bpf', [])
+    
+    # If leg shape is chonk or xl, do nothing
+    if tbse_properties.leg_shape in ['chonk', 'xl']:
         return
-    # if NSFW is enabled, and if BPF is enabled, and genital toggle is on AFAB, show BPF model
-    elif tbse_properties['show_nsfw'] and tbse_properties['show_bpf'] and tbse_properties.genital_toggle == 'afab':
-        for obj in genitals_bpf: bpy.data.objects[obj].hide_set(False)
-    else: 
-        for obj in genitals_bpf: bpy.data.objects[obj].hide_set(True)
+    
+    # Show BPF models only if NSFW, BPF, and AFAB are all enabled
+    show_bpf = (tbse_properties['show_nsfw'] and 
+                tbse_properties['show_bpf'] and 
+                tbse_properties.genital_toggle == 'afab')
+    
+    safe_hide_objects(bpf_models, hide=not show_bpf)
 
 
 def genitalSet(self, context):

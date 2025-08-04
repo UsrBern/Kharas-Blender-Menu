@@ -16,6 +16,8 @@ from . import panels
 from . import lists
 from . import json_helpers
 from . import drivers
+from . import constants
+from . import utils
 
 def register():
     # Register in dependency order: properties first, then UI components
